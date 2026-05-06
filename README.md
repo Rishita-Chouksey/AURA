@@ -1,7 +1,7 @@
 
-# AURA Dashboard
+# AURA - Agentic Unified Risk Analyzer
 
-A modern, light-themed healthcare dashboard for monitoring and analyzing medical data using the AURA backend system.
+A modern, responsive dashboard for monitoring and analyzing medical data using the AURA system.
 
 ## 🎨 Features
 
@@ -14,11 +14,6 @@ A modern, light-themed healthcare dashboard for monitoring and analyzing medical
 - **Alert System**: Real-time alerts for high-risk cases
 
 ## 🚀 Quick Start
-
-### Prerequisites
-- Node.js (v16+)
-- npm or yarn
-- AURA Backend (Python) running locally or on a server
 
 ### Installation
 
@@ -44,7 +39,11 @@ REACT_APP_BACKEND_URL=http://localhost:5000
 npm run dev
 ```
 
-The dashboard will be available at `http://localhost:5173`
+## 🎞️ The dashboard is available at
+
+For local host :- `http://localhost:5173`
+
+Deployed link :- `https://darling-lamington-f0efcb.netlify.app/`
 
 ## 📚 Project Structure
 
@@ -100,14 +99,6 @@ npm run preview
 npm lint
 ```
 
-## 🌈 Theme
-
-The dashboard features a professional light theme with:
-- Light background (#f8fafc)
-- Dark text for readability (#1e293b)
-- Indigo accent color (#6366f1)
-- Smooth transitions and animations
-
 ## 🛠️ API Usage
 
 Import and use the API service in your components:
@@ -141,20 +132,6 @@ Real-time alert system for high-risk patient cases:
 - **Sentiment Analysis**: Analyze patient feedback sentiment
 - **Alerts**: High-risk case alerts
 - **Statistics**: Key metrics and KPIs
-
-## 🔐 Security Notes
-
-- Keep `.env.local` secure (not committed to git)
-- Backend should handle CORS appropriately
-- Use HTTPS in production
-- Implement authentication/authorization as needed
-
-## 🤝 Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Commit with clear messages
-4. Push and create a pull request
 
 ## 📝 License
 
