@@ -1,678 +1,1029 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
-  XAxis, YAxis, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 
-// ─── MEDICINE DATABASE ────────────────────────────────────────────────────────
-const MEDICINE_DB = [
-  { id: 1, name: "Paracetamol", brand: "Calpol / Dolo 650", category: "Analgesic", uses: ["fever", "headache", "body pain", "cold", "flu", "toothache"], dosage: "500–1000mg every 4–6 hrs", sideEffects: ["liver damage (overdose)", "rash", "nausea"], risk: "LOW", rating: 4.6, reviews: 1240, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 2, name: "Ibuprofen", brand: "Brufen / Advil", category: "NSAID", uses: ["fever", "headache", "inflammation", "arthritis", "menstrual pain", "toothache", "muscle pain"], dosage: "200–400mg every 4–6 hrs", sideEffects: ["stomach upset", "GI bleeding", "kidney issues"], risk: "LOW", rating: 4.3, reviews: 980, manufacturer: "Abbott", sentiment: "POSITIVE" },
-  { id: 3, name: "Aspirin", brand: "Ecosprin", category: "NSAID", uses: ["fever", "headache", "blood clot prevention", "heart attack prevention", "pain"], dosage: "75–325mg daily", sideEffects: ["bleeding", "stomach ulcer", "tinnitus"], risk: "MEDIUM", rating: 4.0, reviews: 760, manufacturer: "Bayer", sentiment: "NEUTRAL" },
-  { id: 4, name: "Diclofenac", brand: "Voveran", category: "NSAID", uses: ["joint pain", "arthritis", "back pain", "inflammation", "muscle pain"], dosage: "50mg 2–3 times/day", sideEffects: ["stomach pain", "headache", "dizziness", "GI bleeding"], risk: "MEDIUM", rating: 4.1, reviews: 540, manufacturer: "Novartis", sentiment: "POSITIVE" },
-  { id: 5, name: "Naproxen", brand: "Naprosyn", category: "NSAID", uses: ["arthritis", "muscle pain", "menstrual cramps", "gout", "headache"], dosage: "250–500mg twice/day", sideEffects: ["stomach upset", "heartburn", "drowsiness"], risk: "LOW", rating: 4.0, reviews: 420, manufacturer: "Roche", sentiment: "NEUTRAL" },
-  { id: 6, name: "Tramadol", brand: "Tramal", category: "Opioid Analgesic", uses: ["severe pain", "post-surgical pain", "chronic pain"], dosage: "50–100mg every 4–6 hrs", sideEffects: ["dizziness", "nausea", "constipation", "dependence"], risk: "HIGH", rating: 3.6, reviews: 310, manufacturer: "Grunenthal", sentiment: "NEGATIVE" },
-  { id: 7, name: "Codeine", brand: "Codinex", category: "Opioid Analgesic", uses: ["moderate pain", "cough", "diarrhea"], dosage: "15–60mg every 4 hrs", sideEffects: ["constipation", "drowsiness", "dependence", "nausea"], risk: "HIGH", rating: 3.4, reviews: 220, manufacturer: "Various", sentiment: "NEGATIVE" },
-  { id: 8, name: "Mefenamic Acid", brand: "Ponstan", category: "NSAID", uses: ["menstrual pain", "mild pain", "headache", "dental pain"], dosage: "500mg 3 times/day", sideEffects: ["diarrhea", "stomach upset", "dizziness"], risk: "LOW", rating: 4.2, reviews: 480, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 9, name: "Amoxicillin", brand: "Mox / Trimox", category: "Antibiotic", uses: ["bacterial infection", "throat infection", "ear infection", "pneumonia", "UTI"], dosage: "250–500mg 3 times/day", sideEffects: ["diarrhea", "rash", "nausea"], risk: "LOW", rating: 4.5, reviews: 870, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 10, name: "Azithromycin", brand: "Zithromax / Azee", category: "Antibiotic", uses: ["respiratory infection", "pneumonia", "STI", "skin infection", "ear infection", "COVID treatment"], dosage: "500mg once/day for 3–5 days", sideEffects: ["nausea", "diarrhea", "abdominal pain"], risk: "LOW", rating: 4.6, reviews: 1100, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 11, name: "Ciprofloxacin", brand: "Ciplox", category: "Antibiotic", uses: ["UTI", "diarrhea", "typhoid", "skin infection", "bone infection"], dosage: "250–500mg twice/day", sideEffects: ["tendon damage", "dizziness", "nausea", "photosensitivity"], risk: "MEDIUM", rating: 4.0, reviews: 590, manufacturer: "Cipla", sentiment: "NEUTRAL" },
-  { id: 12, name: "Doxycycline", brand: "Vibramycin", category: "Antibiotic", uses: ["acne", "malaria prevention", "chlamydia", "Lyme disease", "respiratory infection"], dosage: "100mg twice/day", sideEffects: ["photosensitivity", "nausea", "esophageal irritation"], risk: "LOW", rating: 4.1, reviews: 430, manufacturer: "Pfizer", sentiment: "NEUTRAL" },
-  { id: 13, name: "Metronidazole", brand: "Flagyl", category: "Antibiotic", uses: ["bacterial vaginosis", "amoeba infection", "dental infection", "C. diff"], dosage: "400–500mg 3 times/day", sideEffects: ["metallic taste", "nausea", "dark urine"], risk: "LOW", rating: 3.9, reviews: 380, manufacturer: "Sanofi", sentiment: "NEUTRAL" },
-  { id: 14, name: "Cephalexin", brand: "Keflex", category: "Antibiotic", uses: ["skin infection", "UTI", "ear infection", "bone infection"], dosage: "250–500mg 4 times/day", sideEffects: ["diarrhea", "nausea", "stomach upset"], risk: "LOW", rating: 4.2, reviews: 340, manufacturer: "Shionogi", sentiment: "POSITIVE" },
-  { id: 15, name: "Levofloxacin", brand: "Levaquin", category: "Antibiotic", uses: ["pneumonia", "sinusitis", "UTI", "prostatitis"], dosage: "500mg once/day", sideEffects: ["tendon rupture", "QT prolongation", "dizziness"], risk: "HIGH", rating: 3.8, reviews: 280, manufacturer: "J&J", sentiment: "NEUTRAL" },
-  { id: 16, name: "Clarithromycin", brand: "Biaxin", category: "Antibiotic", uses: ["pneumonia", "strep throat", "H. pylori", "skin infection"], dosage: "250–500mg twice/day", sideEffects: ["diarrhea", "nausea", "taste disturbance"], risk: "LOW", rating: 4.1, reviews: 300, manufacturer: "Abbott", sentiment: "POSITIVE" },
-  { id: 17, name: "Clindamycin", brand: "Dalacin", category: "Antibiotic", uses: ["dental abscess", "skin infection", "anaerobic infection", "MRSA"], dosage: "150–450mg 4 times/day", sideEffects: ["C. diff colitis", "diarrhea", "nausea"], risk: "MEDIUM", rating: 3.9, reviews: 250, manufacturer: "Pfizer", sentiment: "NEUTRAL" },
-  { id: 18, name: "Co-amoxiclav", brand: "Augmentin", category: "Antibiotic", uses: ["sinusitis", "pneumonia", "UTI", "skin infection", "ear infection"], dosage: "625mg 3 times/day", sideEffects: ["diarrhea", "nausea", "rash"], risk: "LOW", rating: 4.3, reviews: 620, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 19, name: "Acyclovir", brand: "Zovirax", category: "Antiviral", uses: ["herpes", "chickenpox", "shingles", "cold sores"], dosage: "200–800mg 5 times/day", sideEffects: ["nausea", "headache", "kidney issues (IV)"], risk: "LOW", rating: 4.3, reviews: 410, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 20, name: "Oseltamivir", brand: "Tamiflu", category: "Antiviral", uses: ["influenza", "flu", "flu prevention"], dosage: "75mg twice/day for 5 days", sideEffects: ["nausea", "vomiting", "headache"], risk: "LOW", rating: 4.0, reviews: 560, manufacturer: "Roche", sentiment: "POSITIVE" },
-  { id: 21, name: "Favipiravir", brand: "FabiFlu", category: "Antiviral", uses: ["COVID-19", "influenza", "viral fever"], dosage: "1800mg twice Day 1, then 800mg twice/day", sideEffects: ["increased uric acid", "diarrhea", "nausea"], risk: "MEDIUM", rating: 3.8, reviews: 340, manufacturer: "Glenmark", sentiment: "NEUTRAL" },
-  { id: 22, name: "Fluconazole", brand: "Diflucan", category: "Antifungal", uses: ["vaginal yeast infection", "oral thrush", "ringworm", "fungal meningitis"], dosage: "50–400mg/day", sideEffects: ["nausea", "headache", "liver toxicity"], risk: "LOW", rating: 4.4, reviews: 480, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 23, name: "Clotrimazole", brand: "Canesten", category: "Antifungal", uses: ["ringworm", "athlete's foot", "vaginal thrush", "jock itch"], dosage: "Apply twice/day topically", sideEffects: ["burning", "skin irritation", "redness"], risk: "LOW", rating: 4.3, reviews: 560, manufacturer: "Bayer", sentiment: "POSITIVE" },
-  { id: 24, name: "Amlodipine", brand: "Norvasc", category: "Calcium Channel Blocker", uses: ["high blood pressure", "hypertension", "angina", "chest pain"], dosage: "5–10mg once/day", sideEffects: ["ankle swelling", "flushing", "dizziness"], risk: "LOW", rating: 4.3, reviews: 720, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 25, name: "Lisinopril", brand: "Zestril", category: "ACE Inhibitor", uses: ["high blood pressure", "heart failure", "diabetic kidney disease"], dosage: "10–40mg once/day", sideEffects: ["dry cough", "dizziness", "hyperkalemia"], risk: "LOW", rating: 4.2, reviews: 680, manufacturer: "AstraZeneca", sentiment: "POSITIVE" },
-  { id: 26, name: "Metoprolol", brand: "Lopressor", category: "Beta Blocker", uses: ["hypertension", "heart failure", "angina", "arrhythmia", "migraine prevention"], dosage: "25–200mg once or twice/day", sideEffects: ["fatigue", "cold hands", "dizziness", "bradycardia"], risk: "LOW", rating: 4.1, reviews: 520, manufacturer: "Novartis", sentiment: "POSITIVE" },
-  { id: 27, name: "Losartan", brand: "Cozaar", category: "ARB", uses: ["hypertension", "diabetic kidney disease", "heart failure"], dosage: "25–100mg once/day", sideEffects: ["dizziness", "hyperkalemia", "kidney issues"], risk: "LOW", rating: 4.2, reviews: 580, manufacturer: "Merck", sentiment: "POSITIVE" },
-  { id: 28, name: "Atorvastatin", brand: "Lipitor", category: "Statin", uses: ["high cholesterol", "cholesterol", "cardiovascular prevention"], dosage: "10–80mg once/day", sideEffects: ["muscle pain", "liver toxicity", "GI upset"], risk: "LOW", rating: 4.3, reviews: 890, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 29, name: "Warfarin", brand: "Coumadin", category: "Anticoagulant", uses: ["blood clot prevention", "DVT", "atrial fibrillation", "stroke prevention"], dosage: "Individualized (INR-guided)", sideEffects: ["bleeding", "bruising", "drug interactions"], risk: "HIGH", rating: 3.5, reviews: 290, manufacturer: "BMS", sentiment: "NEGATIVE" },
-  { id: 30, name: "Metformin", brand: "Glucophage", category: "Antidiabetic", uses: ["diabetes", "type 2 diabetes", "high blood sugar", "PCOS"], dosage: "500–2000mg/day with meals", sideEffects: ["GI upset", "nausea", "vitamin B12 deficiency"], risk: "LOW", rating: 4.4, reviews: 1050, manufacturer: "Merck", sentiment: "POSITIVE" },
-  { id: 31, name: "Insulin Glargine", brand: "Lantus", category: "Insulin", uses: ["diabetes", "type 1 diabetes", "type 2 diabetes"], dosage: "Individualized SC injection once/day", sideEffects: ["hypoglycemia", "injection site reactions", "weight gain"], risk: "MEDIUM", rating: 4.3, reviews: 540, manufacturer: "Sanofi", sentiment: "POSITIVE" },
-  { id: 32, name: "Empagliflozin", brand: "Jardiance", category: "SGLT2 Inhibitor", uses: ["type 2 diabetes", "heart failure", "diabetic kidney disease"], dosage: "10–25mg once/day", sideEffects: ["UTI", "genital yeast infection", "DKA (rare)"], risk: "LOW", rating: 4.2, reviews: 320, manufacturer: "Boehringer", sentiment: "POSITIVE" },
-  { id: 33, name: "Salbutamol", brand: "Ventolin", category: "Bronchodilator", uses: ["asthma", "wheezing", "COPD", "breathlessness", "bronchospasm"], dosage: "100–200mcg inhaler every 4–6 hrs PRN", sideEffects: ["tremor", "palpitations", "headache"], risk: "LOW", rating: 4.6, reviews: 980, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 34, name: "Budesonide", brand: "Pulmicort", category: "Inhaled Corticosteroid", uses: ["asthma", "COPD", "wheezing", "allergic rhinitis"], dosage: "200–800mcg/day inhaled", sideEffects: ["oral thrush", "hoarseness", "adrenal suppression (high dose)"], risk: "LOW", rating: 4.3, reviews: 560, manufacturer: "AstraZeneca", sentiment: "POSITIVE" },
-  { id: 35, name: "Cetirizine", brand: "Zyrtec", category: "Antihistamine", uses: ["allergy", "hay fever", "urticaria", "sneezing", "itching", "seasonal allergy", "rhinitis"], dosage: "10mg once/day", sideEffects: ["drowsiness", "dry mouth", "headache"], risk: "LOW", rating: 4.5, reviews: 1120, manufacturer: "UCB", sentiment: "POSITIVE" },
-  { id: 36, name: "Loratadine", brand: "Claritin", category: "Antihistamine", uses: ["allergy", "hay fever", "urticaria", "sneezing", "seasonal allergy"], dosage: "10mg once/day", sideEffects: ["headache", "dry mouth", "fatigue"], risk: "LOW", rating: 4.4, reviews: 880, manufacturer: "Bayer", sentiment: "POSITIVE" },
-  { id: 37, name: "Fexofenadine", brand: "Allegra", category: "Antihistamine", uses: ["allergy", "seasonal allergy", "urticaria", "hay fever", "sneezing"], dosage: "120–180mg once/day", sideEffects: ["headache", "nausea", "dizziness"], risk: "LOW", rating: 4.3, reviews: 650, manufacturer: "Sanofi", sentiment: "POSITIVE" },
-  { id: 38, name: "Omeprazole", brand: "Prilosec", category: "PPI", uses: ["acid reflux", "heartburn", "GERD", "peptic ulcer", "stomach ulcer"], dosage: "20–40mg once/day", sideEffects: ["headache", "nausea", "hypomagnesemia (long term)"], risk: "LOW", rating: 4.5, reviews: 1050, manufacturer: "AstraZeneca", sentiment: "POSITIVE" },
-  { id: 39, name: "Pantoprazole", brand: "Protonix", category: "PPI", uses: ["acid reflux", "GERD", "peptic ulcer", "heartburn", "stomach acid"], dosage: "40mg once/day", sideEffects: ["headache", "diarrhea", "nausea"], risk: "LOW", rating: 4.4, reviews: 820, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 40, name: "Ondansetron", brand: "Zofran", category: "Antiemetic", uses: ["nausea", "vomiting", "chemotherapy nausea", "post-op nausea"], dosage: "4–8mg 3 times/day", sideEffects: ["constipation", "headache", "QT prolongation"], risk: "LOW", rating: 4.5, reviews: 730, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 41, name: "Sertraline", brand: "Zoloft", category: "SSRI", uses: ["depression", "anxiety", "OCD", "PTSD", "panic disorder"], dosage: "50–200mg once/day", sideEffects: ["nausea", "insomnia", "sexual dysfunction", "suicidal ideation (young)"], risk: "MEDIUM", rating: 4.0, reviews: 820, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 42, name: "Escitalopram", brand: "Lexapro", category: "SSRI", uses: ["depression", "anxiety", "generalized anxiety", "panic disorder"], dosage: "10–20mg once/day", sideEffects: ["nausea", "insomnia", "drowsiness", "sexual dysfunction"], risk: "LOW", rating: 4.1, reviews: 680, manufacturer: "Lundbeck", sentiment: "POSITIVE" },
-  { id: 43, name: "Alprazolam", brand: "Xanax", category: "Benzodiazepine", uses: ["anxiety", "panic disorder", "social anxiety"], dosage: "0.25–0.5mg 3 times/day", sideEffects: ["dependence", "drowsiness", "cognitive impairment", "withdrawal"], risk: "HIGH", rating: 4.0, reviews: 560, manufacturer: "Pfizer", sentiment: "NEUTRAL" },
-  { id: 44, name: "Zolpidem", brand: "Ambien", category: "Hypnotic", uses: ["insomnia", "sleep disorder", "difficulty sleeping"], dosage: "5–10mg at bedtime", sideEffects: ["next-day drowsiness", "sleepwalking", "dependence", "hallucinations"], risk: "MEDIUM", rating: 3.9, reviews: 470, manufacturer: "Sanofi", sentiment: "NEUTRAL" },
-  { id: 45, name: "Gabapentin", brand: "Neurontin", category: "Anticonvulsant", uses: ["neuropathic pain", "seizure", "shingles pain", "fibromyalgia", "restless leg syndrome"], dosage: "300–3600mg/day in divided doses", sideEffects: ["dizziness", "drowsiness", "weight gain", "edema"], risk: "LOW", rating: 4.0, reviews: 590, manufacturer: "Pfizer", sentiment: "NEUTRAL" },
-  { id: 46, name: "Sumatriptan", brand: "Imitrex", category: "Triptan", uses: ["migraine", "cluster headache", "severe headache"], dosage: "25–100mg at onset, repeat after 2 hrs", sideEffects: ["chest tightness", "dizziness", "flushing"], risk: "MEDIUM", rating: 4.4, reviews: 520, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 47, name: "Levothyroxine", brand: "Synthroid", category: "Thyroid Hormone", uses: ["hypothyroidism", "thyroid deficiency", "fatigue", "weight gain"], dosage: "25–200mcg once/day on empty stomach", sideEffects: ["palpitations", "insomnia", "sweating (overdose)"], risk: "LOW", rating: 4.5, reviews: 870, manufacturer: "Abbott", sentiment: "POSITIVE" },
-  { id: 48, name: "Isotretinoin", brand: "Accutane", category: "Retinoid", uses: ["severe acne", "cystic acne", "nodular acne"], dosage: "0.5–1mg/kg/day for 15–20 weeks", sideEffects: ["birth defects (teratogenic)", "dry skin/lips", "mood changes", "liver toxicity"], risk: "HIGH", rating: 4.3, reviews: 520, manufacturer: "Roche", sentiment: "POSITIVE" },
-  { id: 49, name: "Vitamin D3", brand: "Cholecalciferol", category: "Vitamin", uses: ["vitamin D deficiency", "bone pain", "osteoporosis", "immune support"], dosage: "1000–4000IU/day", sideEffects: ["hypercalcemia (high dose)", "nausea", "weakness"], risk: "LOW", rating: 4.5, reviews: 980, manufacturer: "Various", sentiment: "POSITIVE" },
-  { id: 50, name: "ORS / Electrolyte Solution", brand: "Electral", category: "Rehydration", uses: ["diarrhea", "dehydration", "gastroenteritis", "vomiting"], dosage: "200ml after each loose stool", sideEffects: ["hypernatremia (excess use)"], risk: "LOW", rating: 4.7, reviews: 1100, manufacturer: "WHO formula", sentiment: "POSITIVE" },
-  { id: 51, name: "Prednisolone", brand: "Deltacortril", category: "Corticosteroid", uses: ["asthma", "inflammation", "allergic reaction", "lupus", "arthritis", "COPD"], dosage: "5–60mg/day", sideEffects: ["weight gain", "osteoporosis", "hyperglycemia", "immunosuppression"], risk: "MEDIUM", rating: 4.0, reviews: 520, manufacturer: "Pfizer", sentiment: "NEUTRAL" },
-  { id: 52, name: "Melatonin", brand: "Circadin", category: "Hypnotic", uses: ["insomnia", "jet lag", "sleep disorder", "shift work"], dosage: "0.5–5mg at bedtime", sideEffects: ["drowsiness", "headache", "dizziness"], risk: "LOW", rating: 4.2, reviews: 780, manufacturer: "Various", sentiment: "POSITIVE" },
-  { id: 53, name: "Vitamin C", brand: "Ascorbic Acid", category: "Vitamin", uses: ["vitamin C deficiency", "scurvy", "immune support", "cold prevention", "wound healing"], dosage: "65–2000mg/day", sideEffects: ["diarrhea (high dose)", "kidney stones (very high dose)"], risk: "LOW", rating: 4.5, reviews: 870, manufacturer: "Various", sentiment: "POSITIVE" },
-  { id: 54, name: "Sildenafil", brand: "Viagra", category: "PDE5 Inhibitor", uses: ["erectile dysfunction", "pulmonary hypertension"], dosage: "25–100mg 1 hr before activity", sideEffects: ["headache", "flushing", "visual disturbance", "hypotension"], risk: "LOW", rating: 4.4, reviews: 690, manufacturer: "Pfizer", sentiment: "POSITIVE" },
-  { id: 55, name: "Hyoscine Butylbromide", brand: "Buscopan", category: "Anticholinergic", uses: ["abdominal cramps", "IBS", "stomach spasm", "ureteric colic"], dosage: "10–20mg 3 times/day", sideEffects: ["dry mouth", "blurred vision", "tachycardia"], risk: "LOW", rating: 4.3, reviews: 540, manufacturer: "Boehringer", sentiment: "POSITIVE" },
-  { id: 56, name: "Amoxicillin", brand: "Mox / Trimox", category: "Antibiotic", uses: ["bacterial infection", "throat infection", "ear infection", "pneumonia", "UTI"], dosage: "250–500mg 3 times/day", sideEffects: ["diarrhea", "rash", "nausea"], risk: "LOW", rating: 4.5, reviews: 870, manufacturer: "GSK", sentiment: "POSITIVE" },
-  { id: 57, name: "Furosemide", brand: "Lasix", category: "Diuretic", uses: ["heart failure", "edema", "hypertension", "kidney disease"], dosage: "20–80mg once/day", sideEffects: ["electrolyte imbalance", "dehydration", "hearing loss (high dose)"], risk: "MEDIUM", rating: 3.9, reviews: 360, manufacturer: "Sanofi", sentiment: "NEUTRAL" },
-  { id: 58, name: "Loperamide", brand: "Imodium", category: "Antidiarrheal", uses: ["diarrhea", "traveler's diarrhea", "IBS diarrhea"], dosage: "2–4mg initially, 2mg after each loose stool", sideEffects: ["constipation", "abdominal cramps", "dizziness"], risk: "LOW", rating: 4.4, reviews: 640, manufacturer: "J&J", sentiment: "POSITIVE" },
-  { id: 59, name: "Domperidone", brand: "Motilium", category: "Antiemetic", uses: ["nausea", "vomiting", "gastroparesis", "bloating"], dosage: "10mg 3 times/day", sideEffects: ["dry mouth", "cardiac arrhythmia (rare)", "drowsiness"], risk: "MEDIUM", rating: 4.0, reviews: 490, manufacturer: "J&J", sentiment: "NEUTRAL" },
-  { id: 60, name: "Albendazole", brand: "Zentel", category: "Anthelmintic", uses: ["worm infestation", "roundworm", "tapeworm", "hookworm", "pinworm"], dosage: "400mg single dose", sideEffects: ["nausea", "abdominal pain", "liver enzyme elevation"], risk: "LOW", rating: 4.3, reviews: 340, manufacturer: "GSK", sentiment: "POSITIVE" },
+/* ───────────────────────────────────────────────────────────────
+   GLOBAL FONT & CSS KEYFRAMES
+─────────────────────────────────────────────────────────────── */
+const GLOBAL_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f0f4f8; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c7d2de; border-radius: 3px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position: 600px 0; }
+  }
+  @keyframes tickerScroll {
+    0%   { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.45); }
+    70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .card-enter { animation: fadeSlideUp 0.38s cubic-bezier(0.16,1,0.3,1) both; }
+  .card-enter-1 { animation-delay: 0.05s; }
+  .card-enter-2 { animation-delay: 0.10s; }
+  .card-enter-3 { animation-delay: 0.15s; }
+  .card-enter-4 { animation-delay: 0.20s; }
+  .shimmer-row {
+    background: linear-gradient(90deg, #f0f4f8 25%, #e2e8ef 50%, #f0f4f8 75%);
+    background-size: 600px 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 6px;
+  }
+`;
+
+/* ───────────────────────────────────────────────────────────────
+   CONSTANTS & MOCK DATA
+─────────────────────────────────────────────────────────────── */
+const CREDENTIALS = [{ email: "doctor@aura.com", password: "password123", name: "Dr. Priya Sharma", role: "Senior Physician" }];
+
+const MEDICINES = [
+  { id: 1, name: "Aspirin",       reviews: 420, suitability: 92, rating: 4.5, risk: "LOW",    effects: ["mild nausea", "stomach upset"] },
+  { id: 2, name: "Ibuprofen",     reviews: 567, suitability: 88, rating: 4.3, risk: "LOW",    effects: ["heartburn", "dizziness"] },
+  { id: 3, name: "Paracetamol",   reviews: 389, suitability: 95, rating: 4.8, risk: "LOW",    effects: ["rare rash", "nausea"] },
+  { id: 4, name: "Metformin",     reviews: 210, suitability: 81, rating: 4.1, risk: "MEDIUM", effects: ["diarrhea", "nausea", "fatigue"] },
+  { id: 5, name: "Lisinopril",    reviews: 173, suitability: 76, rating: 3.9, risk: "MEDIUM", effects: ["dry cough", "dizziness"] },
+  { id: 6, name: "Warfarin",      reviews: 56,  suitability: 62, rating: 3.8, risk: "HIGH",   effects: ["bleeding risk", "bruising"] },
 ];
 
-const CATEGORY_COUNTS = {};
-const SYMPTOM_COUNTS = {};
-MEDICINE_DB.forEach(m => {
-  CATEGORY_COUNTS[m.category] = (CATEGORY_COUNTS[m.category] || 0) + 1;
-  m.uses.forEach(u => { SYMPTOM_COUNTS[u] = (SYMPTOM_COUNTS[u] || 0) + 1; });
-});
+const RISK_PIE = [
+  { name: "Low",    value: 3, color: "#22c55e" },
+  { name: "Medium", value: 2, color: "#f59e0b" },
+  { name: "High",   value: 1, color: "#ef4444" },
+];
 
-const TOP_CATEGORIES = Object.entries(CATEGORY_COUNTS).sort((a, b) => b[1] - a[1]).slice(0, 8);
-const TOP_SYMPTOMS = Object.entries(SYMPTOM_COUNTS).sort((a, b) => b[1] - a[1]).slice(0, 12);
-const RISK_COLORS = { LOW: "#059669", MEDIUM: "#d97706", HIGH: "#dc2626" };
+const SENTIMENT_TREND = [
+  { date: "Mon", positive: 30, neutral: 44, negative: 26 },
+  { date: "Tue", positive: 28, neutral: 41, negative: 31 },
+  { date: "Wed", positive: 36, neutral: 39, negative: 25 },
+  { date: "Thu", positive: 22, neutral: 37, negative: 41 },
+  { date: "Fri", positive: 41, neutral: 35, negative: 24 },
+  { date: "Sat", positive: 46, neutral: 37, negative: 17 },
+  { date: "Sun", positive: 39, neutral: 43, negative: 18 },
+];
 
-function riskBadge(risk) {
-  const styles = {
-    LOW: { bg: "#ecfdf5", color: "#065f46", label: "✓ Safe" },
-    MEDIUM: { bg: "#fffbeb", color: "#92400e", label: "◉ Caution" },
-    HIGH: { bg: "#fef2f2", color: "#991b1b", label: "⚠ High Risk" },
-  };
-  const s = styles[risk];
+const BAR_DATA = MEDICINES.map(m => ({ name: m.name.slice(0, 4), reviews: m.reviews }));
+
+const SYMPTOM_DATA = [
+  { name: "Headache", count: 42 }, { name: "Fever", count: 38 },
+  { name: "Nausea", count: 29 },   { name: "Fatigue", count: 55 },
+  { name: "Dizziness", count: 21 },{ name: "Chest", count: 14 },
+];
+
+const SAMPLE_TEXTS = [
+  { label: "Severe headache after medication", text: "I've had a severe splitting headache for the past 6 hours after taking my new blood pressure medication. The pain is unbearable, and I feel like I'm going to vomit. My vision is slightly blurred." },
+  { label: "Mild fever since morning",          text: "Woke up with a mild fever this morning, around 99.5°F. Feeling a bit tired and have a slight sore throat. Took some Tylenol and drinking plenty of fluids." },
+  { label: "Feeling dizzy and nauseous",        text: "I've been feeling dizzy and nauseous since yesterday. The room spins when I stand up. Also experiencing some chest tightness and shortness of breath." },
+];
+
+const MOCK_ANALYSIS = {
+  severe: { symptoms: ["severe headache","nausea","blurred vision","medication reaction"], sentiment: "negative", risk_level: "HIGH",   confidence: 94, reason: ["Multiple severe symptoms detected simultaneously","Strongly negative sentiment signals acute distress","Blurred vision + headache matches hypertensive crisis","Post-medication onset suggests adverse drug reaction"] },
+  mild:   { symptoms: ["mild fever","fatigue","sore throat"],                              sentiment: "neutral",  risk_level: "LOW",    confidence: 87, reason: ["Symptoms are mild and localized","Neutral sentiment indicates manageable condition","Patient is self-managing appropriately","No red-flag symptoms detected"] },
+  dizzy:  { symptoms: ["dizziness","nausea","chest tightness","shortness of breath"],      sentiment: "negative", risk_level: "MEDIUM", confidence: 79, reason: ["Combination of dizziness and chest tightness requires monitoring","Respiratory symptoms elevate risk tier","Negative sentiment indicates patient distress","Pattern resembles early cardiovascular event"] },
+};
+
+const FALLBACK_UPDATES = [
+  { emoji: "🦠", type: "Outbreak",  text: "Influenza A(H3N2) cases spiking 34% across northern regions — hospitalizations rising sharply." },
+  { emoji: "📈", type: "Trend",     text: "Antibiotic-resistant UTI reports rising 22% in urban clinics over the past two weeks." },
+  { emoji: "⚠️", type: "Warning",  text: "Ibuprofen overuse linked to increased GI bleeding risk in patients over 60 — dose review advised." },
+  { emoji: "💊", type: "Drug",      text: "Metformin XR batch #7741 recalled due to NDMA impurity exceeding FDA thresholds." },
+  { emoji: "📈", type: "Trend",     text: "Dengue fever cases rising 41% in South Asian urban districts — vector control urgently needed." },
+];
+
+const RISK_CFG = {
+  HIGH:   { color: "#ef4444", bg: "#fef2f2", border: "#fecaca", text: "#dc2626", icon: "⚠", pulse: true },
+  MEDIUM: { color: "#f59e0b", bg: "#fffbeb", border: "#fde68a", text: "#d97706", icon: "◉", pulse: false },
+  LOW:    { color: "#22c55e", bg: "#f0fdf4", border: "#bbf7d0", text: "#16a34a", icon: "✓", pulse: false },
+};
+
+const UPDATE_COLORS = { "🦠": "#8b5cf6", "📈": "#0ea5e9", "⚠️": "#f59e0b", "💊": "#10b981" };
+const UPDATE_BG     = { "🦠": "#f5f3ff", "📈": "#f0f9ff", "⚠️": "#fffbeb", "💊": "#f0fdf4" };
+const UPDATE_BORDER = { "🦠": "#ddd6fe", "📈": "#bae6fd", "⚠️": "#fde68a", "💊": "#bbf7d0" };
+
+/* ───────────────────────────────────────────────────────────────
+   ANTHROPIC API — AI HEALTH UPDATES
+─────────────────────────────────────────────────────────────── */
+async function fetchAIHealthUpdates() {
+  const prompt = `You are an AI-powered health intelligence engine.
+Analyze data aggregated from multiple sources such as:
+- News articles
+- Public health reports
+- Government datasets
+- Social media trends
+
+Your goal is to generate real-time "Health Updates" that provide actionable insights, not raw data.
+Focus on identifying:
+1. Emerging diseases or outbreaks
+2. Sudden increases or spikes in health-related issues
+3. Drug or medicine warnings, recalls, or side effects
+4. Public health risks or safety alerts
+
+Guidelines:
+- Keep each update concise (1–2 lines max)
+- Make insights clear, specific, and impactful
+- Use trend indicators like "rising", "spiking", "declining"
+- Avoid generic statements
+- Prioritize relevance and urgency
+
+Output format:
+- Return 4 to 5 updates
+- Each update must start with an emoji indicator:
+  📈 for rising trends
+  ⚠️ for warnings
+  🦠 for diseases/outbreaks
+  💊 for medicines/drugs
+
+Do NOT include explanations, metadata, or extra text. Only return the formatted updates, one per line.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  const data = await res.json();
+  const raw = (data.content || []).map(b => b.text || "").join("\n");
+  const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 4 && /^[📈⚠️🦠💊]/.test(l));
+  if (!lines.length) throw new Error("No updates");
+
+  const typeMap = { "📈": "Trend", "⚠️": "Warning", "🦠": "Outbreak", "💊": "Drug" };
+  return lines.map(line => {
+    const emoji = [...line].find(c => "📈⚠️🦠💊".includes(c)) || "📈";
+    return { emoji, type: typeMap[emoji] || "Update", text: line.replace(/^[📈⚠️🦠💊]\s*/, "").trim() };
+  });
+}
+
+function getMockAnalysis(text) {
+  const t = text.toLowerCase();
+  if (t.includes("severe") || t.includes("blurred") || t.includes("unbearable")) return MOCK_ANALYSIS.severe;
+  if (t.includes("mild") || t.includes("sore throat") || t.includes("tylenol")) return MOCK_ANALYSIS.mild;
+  return MOCK_ANALYSIS.dizzy;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   TINY REUSABLE ATOMS
+─────────────────────────────────────────────────────────────── */
+const CARD = { background: "#fff", borderRadius: "16px", border: "1px solid #e8eef4", boxShadow: "0 2px 12px rgba(15,23,42,0.06)", overflow: "hidden" };
+
+function Badge({ label, color, bg, border }) {
   return (
-    <span style={{ background: s.bg, color: s.color, padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: "0.3px" }}>
-      {s.label}
+    <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: "8px", padding: "3px 10px", fontSize: "11px", fontWeight: "600", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>
+      {label}
     </span>
   );
 }
 
-function Stars({ rating }) {
+function StatCard({ label, value, sub, accent, delay = "" }) {
   return (
-    <span style={{ color: "#f59e0b", fontSize: 12 }}>
-      {"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))}
-      <span style={{ color: "#94a3b8", marginLeft: 4, fontSize: 11 }}>{rating.toFixed(1)}</span>
-    </span>
+    <div className={`card-enter ${delay}`} style={{ ...CARD, padding: "18px 20px", borderLeft: `3px solid ${accent}` }}>
+      <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>{label}</div>
+      <div style={{ fontSize: "26px", fontWeight: "800", color: "#0f172a", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "5px" }}>{sub}</div>
+    </div>
   );
 }
 
-function searchMedicines(query, filters) {
-  let results = MEDICINE_DB.filter(m => {
-    if (filters.category && m.category !== filters.category) return false;
-    if (filters.risk && m.risk !== filters.risk) return false;
-    if (!query.trim()) return true;
-    const q = query.toLowerCase().trim();
-    return (
-      m.name.toLowerCase().includes(q) ||
-      (m.brand && m.brand.toLowerCase().includes(q)) ||
-      m.category.toLowerCase().includes(q) ||
-      m.uses.some(u => u.includes(q)) ||
-      (m.manufacturer && m.manufacturer.toLowerCase().includes(q))
-    );
-  });
-  if (query.trim()) {
-    const q = query.toLowerCase().trim();
-    results = results.map(m => {
-      let score = 0;
-      if (m.name.toLowerCase().startsWith(q)) score += 100;
-      else if (m.name.toLowerCase().includes(q)) score += 60;
-      if (m.uses.some(u => u === q)) score += 80;
-      else if (m.uses.some(u => u.includes(q))) score += 40;
-      score += m.reviews / 1000;
-      return { ...m, score };
-    });
-    results.sort((a, b) => b.score - a.score);
-  }
-  return results;
+function Spinner({ size = 18, color = "#6366f1" }) {
+  return <span style={{ display: "inline-block", width: size, height: size, border: `2px solid ${color}30`, borderTopColor: color, borderRadius: "50%", animation: "spin 0.75s linear infinite" }} />;
 }
 
-function getSuggestions(query) {
-  if (!query || query.length < 2) return [];
-  const q = query.toLowerCase();
-  const names = MEDICINE_DB.filter(m => m.name.toLowerCase().includes(q)).slice(0, 3).map(m => ({ text: m.name, type: "medicine" }));
-  const symptoms = [...new Set(MEDICINE_DB.flatMap(m => m.uses))].filter(u => u.includes(q)).slice(0, 3).map(u => ({ text: u, type: "symptom" }));
-  return [...names, ...symptoms].slice(0, 6);
+function ShimmerBlock({ h = 14, w = "100%", mb = 10 }) {
+  return <div className="shimmer-row" style={{ height: h, width: w, marginBottom: mb }} />;
 }
 
-// ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
-function useBreakpoint() {
-  const [bp, setBp] = useState(() => {
-    if (typeof window === "undefined") return "desktop";
-    return window.innerWidth < 768 ? "mobile" : window.innerWidth < 1100 ? "tablet" : "desktop";
-  });
-  useEffect(() => {
-    const handler = () => {
-      const w = window.innerWidth;
-      setBp(w < 768 ? "mobile" : w < 1100 ? "tablet" : "desktop");
-    };
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-  return bp;
-}
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px 14px", boxShadow: "0 8px 24px rgba(15,23,42,0.12)", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "5px", fontWeight: "600" }}>{label}</div>
+      {payload.map((p, i) => <div key={i} style={{ fontSize: "13px", color: p.color, fontFamily: "'JetBrains Mono', monospace", fontWeight: "500" }}>{p.name}: {p.value}</div>)}
+    </div>
+  );
+};
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const [query, setQuery] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filters, setFilters] = useState({ category: "", risk: "" });
-  const [results, setResults] = useState(MEDICINE_DB);
-  const [selected, setSelected] = useState(null);
-  const [bookmarks, setBookmarks] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [view, setView] = useState("search");
-  const [darkMode, setDarkMode] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const bp = useBreakpoint();
-  const ITEMS_PER_PAGE = bp === "mobile" ? 8 : bp === "tablet" ? 9 : 12;
-  const inputRef = useRef(null);
-  const debounceRef = useRef(null);
-
-  const isMobile = bp === "mobile";
-  const isTablet = bp === "tablet";
-  const isDesktop = bp === "desktop";
-
-  const t = darkMode ? {
-    bg: "#0a0f1e", surface: "#111827", card: "#1a2235", border: "#1e2d45",
-    text: "#f0f6ff", subtext: "#7c93b5", accent: "#4f8ef7", input: "#111827",
-    accentLight: "#1a2d4e", headerBg: "#0d1526",
-  } : {
-    bg: "#f0f5ff", surface: "#ffffff", card: "#ffffff", border: "#dce8f8",
-    text: "#0d1b2e", subtext: "#6b7d9a", accent: "#2563eb", input: "#ffffff",
-    accentLight: "#eff4ff", headerBg: "#ffffff",
-  };
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQ(query), 200);
-    setSuggestions(getSuggestions(query));
-  }, [query]);
-
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setResults(searchMedicines(debouncedQ, filters));
-      setPage(1);
-      setLoading(false);
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [debouncedQ, filters]);
-
-  const handleSearch = useCallback((term) => {
-    setQuery(term);
-    setShowSuggestions(false);
-    if (term.trim()) setHistory(h => [term, ...h.filter(x => x !== term)].slice(0, 8));
-  }, []);
-
-  const toggleBookmark = useCallback((id) => {
-    setBookmarks(b => b.includes(id) ? b.filter(x => x !== id) : [...b, id]);
-  }, []);
-
-  const paginatedResults = results.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-  const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
-  const categories = [...new Set(MEDICINE_DB.map(m => m.category))].sort();
-
-  const piData = [
-    { name: "Safe", value: MEDICINE_DB.filter(m => m.risk === "LOW").length, color: "#059669" },
-    { name: "Caution", value: MEDICINE_DB.filter(m => m.risk === "MEDIUM").length, color: "#d97706" },
-    { name: "High Risk", value: MEDICINE_DB.filter(m => m.risk === "HIGH").length, color: "#dc2626" },
-  ];
-  const catData = TOP_CATEGORIES.slice(0, 6).map(([name, count]) => ({ name: name.split(" ")[0], count }));
-
-  // Sidebar content (shared between desktop sidebar and mobile drawer)
-  const SidebarContent = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: isMobile ? "0 0 80px 0" : 0 }}>
-      {/* Search */}
-      <div style={{ position: "relative" }}>
-        <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: t.subtext, pointerEvents: "none" }}>🔍</span>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => { setQuery(e.target.value); setShowSuggestions(true); }}
-            onKeyDown={e => { if (e.key === "Enter") { handleSearch(query); setShowSuggestions(false); } if (e.key === "Escape") setShowSuggestions(false); }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Search medicines, symptoms..."
-            style={{ width: "100%", padding: "10px 34px 10px 34px", borderRadius: 10, border: `1.5px solid ${t.border}`, background: t.input, color: t.text, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box", transition: "border-color 0.15s" }}
-          />
-          {query && (
-            <button onClick={() => { setQuery(""); setDebouncedQ(""); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: t.subtext, fontSize: 15, padding: 0, lineHeight: 1 }}>✕</button>
-          )}
-        </div>
-        {showSuggestions && suggestions.length > 0 && (
-          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 9999 }}>
-            {suggestions.map((s2, i) => (
-              <div key={i} onMouseDown={() => handleSearch(s2.text)}
-                style={{ padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: t.text, borderBottom: i < suggestions.length - 1 ? `1px solid ${t.border}` : "none" }}
-                onMouseEnter={e => e.currentTarget.style.background = t.accentLight}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <span style={{ opacity: 0.6 }}>{s2.type === "medicine" ? "💊" : "🩺"}</span>
-                <span>{s2.text}</span>
-                <span style={{ marginLeft: "auto", fontSize: 10, background: s2.type === "medicine" ? "#ede9fe" : "#dcfce7", color: s2.type === "medicine" ? "#6d28d9" : "#065f46", padding: "1px 7px", borderRadius: 10, fontWeight: 600 }}>{s2.type}</span>
-              </div>
-            ))}
-          </div>
-        )}
+/* ───────────────────────────────────────────────────────────────
+   LIVE TICKER
+─────────────────────────────────────────────────────────────── */
+function LiveTicker({ updates }) {
+  if (!updates.length) return null;
+  const text = updates.map(u => `${u.emoji} ${u.text}`).join("    ·    ");
+  return (
+    <div style={{ background: "#0f172a", borderBottom: "1px solid rgba(99,102,241,0.3)", height: "32px", overflow: "hidden", display: "flex", alignItems: "center", position: "relative" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "80px", background: "linear-gradient(to right, #0f172a, transparent)", zIndex: 2 }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "80px", background: "linear-gradient(to left, #0f172a, transparent)", zIndex: 2 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "absolute", left: "80px" }}>
+        <span style={{ fontSize: "9px", fontWeight: "700", color: "#f59e0b", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: "4px", padding: "1px 6px", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono', monospace", animation: "blink 1.5s infinite" }}>LIVE</span>
       </div>
-
-      {/* Filters */}
-      <div style={{ background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Filters</div>
-        <div style={{ fontSize: 11, color: t.subtext, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Category</div>
-        <select value={filters.category} onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}
-          style={{ width: "100%", padding: "7px 9px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontFamily: "inherit", fontSize: 12, marginBottom: 12, outline: "none" }}>
-          <option value="">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <div style={{ fontSize: 11, color: t.subtext, marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Risk Level</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {["", "LOW", "MEDIUM", "HIGH"].map(r => (
-            <label key={r} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: t.text }}>
-              <input type="radio" name="risk" value={r} checked={filters.risk === r} onChange={() => setFilters(f => ({ ...f, risk: r }))} style={{ accentColor: t.accent }} />
-              {r === "" ? "All Risks" : r === "LOW" ? "✓ Safe" : r === "MEDIUM" ? "◉ Caution" : "⚠ High Risk"}
-            </label>
-          ))}
-        </div>
-        {(filters.category || filters.risk) && (
-          <button onClick={() => setFilters({ category: "", risk: "" })}
-            style={{ width: "100%", padding: "6px", marginTop: 10, borderRadius: 7, border: `1px solid ${t.border}`, background: "transparent", color: t.subtext, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "background 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.background = t.accentLight}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            Clear filters
-          </button>
-        )}
-      </div>
-
-      {/* Recent Searches */}
-      {history.length > 0 && (
-        <div style={{ background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Recent Searches</div>
-          {history.slice(0, 6).map((h, i) => (
-            <div key={i} onClick={() => { handleSearch(h); setSidebarOpen(false); }}
-              style={{ padding: "5px 0", cursor: "pointer", fontSize: 12, color: t.subtext, display: "flex", alignItems: "center", gap: 6, borderBottom: i < Math.min(history.length, 6) - 1 ? `1px solid ${t.border}` : "none", transition: "color 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.color = t.accent}
-              onMouseLeave={e => e.currentTarget.style.color = t.subtext}>
-              <span style={{ fontSize: 10 }}>⟳</span> {h}
-            </div>
-          ))}
-          <button onClick={() => setHistory([])} style={{ marginTop: 8, fontSize: 11, color: t.subtext, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>Clear all</button>
-        </div>
-      )}
-
-      {/* DB Stats */}
-      <div style={{ background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Database</div>
-        {[
-          ["Total Medicines", MEDICINE_DB.length, "#2563eb"],
-          ["Safe to Use", MEDICINE_DB.filter(m => m.risk === "LOW").length, "#059669"],
-          ["Categories", categories.length, "#d97706"],
-          ["Reviews", MEDICINE_DB.reduce((s, m) => s + m.reviews, 0).toLocaleString(), "#7c3aed"],
-        ].map(([label, val, col]) => (
-          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7, fontSize: 12 }}>
-            <span style={{ color: t.subtext }}>{label}</span>
-            <span style={{ fontWeight: 800, color: col }}>{val}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Top Symptoms */}
-      <div style={{ background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Top Symptoms</div>
-        {TOP_SYMPTOMS.slice(0, 8).map(([sym, count]) => (
-          <div key={sym} onClick={() => { handleSearch(sym); setView("search"); setSidebarOpen(false); }}
-            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", cursor: "pointer", borderBottom: `1px solid ${t.border}`, fontSize: 12, transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = t.accent}
-            onMouseLeave={e => e.currentTarget.style.color = t.text}>
-            <span style={{ color: t.text }}>{sym}</span>
-            <span style={{ background: "#ede9fe", color: "#6d28d9", padding: "1px 7px", borderRadius: 10, fontSize: 10, fontWeight: 700 }}>{count}</span>
-          </div>
-        ))}
+      <div style={{ whiteSpace: "nowrap", animation: "tickerScroll 38s linear infinite", fontSize: "12px", color: "#94a3b8", fontFamily: "'Plus Jakarta Sans', sans-serif", paddingLeft: "120px" }}>
+        {text}
       </div>
     </div>
   );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   NAVBAR
+─────────────────────────────────────────────────────────────── */
+function Navbar({ page, setPage, user, onLogout, updates }) {
+  const [dropdown, setDropdown] = useState(false);
+  const NAV = ["Dashboard", "Medicines", "Reviews", "Analytics", "Updates", "Profile", "Settings"];
 
   return (
-    <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column", background: t.bg, color: t.text, fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", overflow: "hidden", boxSizing: "border-box" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-
-      {/* HEADER */}
-      <header style={{ background: t.headerBg, borderBottom: `1px solid ${t.border}`, padding: isMobile ? "0 12px" : "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: isMobile ? 54 : 60, flexShrink: 0, boxShadow: darkMode ? "0 1px 12px rgba(0,0,0,0.4)" : "0 1px 8px rgba(37,99,235,0.07)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {isMobile && (
-            <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: t.text, fontSize: 20, padding: "4px 6px", marginRight: 2, borderRadius: 6, lineHeight: 1 }}>
-              ☰
-            </button>
-          )}
-          <div style={{ background: "linear-gradient(135deg, #1d4ed8, #4f46e5)", width: 32, height: 32, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 16, flexShrink: 0 }}>A</div>
-          <span style={{ fontWeight: 800, fontSize: isMobile ? 18 : 21, background: "linear-gradient(135deg, #1d4ed8, #4f46e5)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AURA</span>
-          {!isMobile && <span style={{ color: t.subtext, fontSize: 12, fontWeight: 500 }}>Medical Assistant</span>}
+    <>
+      <nav style={{ background: "linear-gradient(135deg, #0f172a 0%, #1a2540 60%, #0f172a 100%)", borderBottom: "1px solid rgba(99,102,241,0.25)", padding: "0 28px", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 200, boxShadow: "0 4px 32px rgba(99,102,241,0.12)" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: "11px", cursor: "pointer" }} onClick={() => setPage("Dashboard")}>
+          <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "#fff", boxShadow: "0 0 14px rgba(99,102,241,0.5)", fontFamily: "'JetBrains Mono', monospace" }}>A</div>
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: "#fff", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.14em", lineHeight: 1 }}>AURA</div>
+            <div style={{ fontSize: "9px", color: "rgba(148,163,184,0.7)", letterSpacing: "0.07em", textTransform: "uppercase" }}>Health Signal Intelligence</div>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: isMobile ? 4 : 6, alignItems: "center" }}>
-          {["search", "bookmarks", "insights"].map(v => (
-            <button key={v} onClick={() => setView(v)}
-              style={{ padding: isMobile ? "5px 10px" : "5px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: isMobile ? 11 : 12, background: view === v ? t.accent : "transparent", color: view === v ? "#fff" : t.subtext, transition: "all 0.15s", whiteSpace: "nowrap" }}>
-              {v === "search" ? (isMobile ? "🔍" : "🔍 Search") : v === "bookmarks" ? (isMobile ? `🔖${bookmarks.length > 0 ? bookmarks.length : ""}` : `🔖 Saved (${bookmarks.length})`) : (isMobile ? "📊" : "📊 Insights")}
+        {/* Nav Items */}
+        <div style={{ display: "flex", gap: "2px" }}>
+          {NAV.slice(0, 5).map(n => (
+            <button key={n} onClick={() => setPage(n)} style={{ background: page === n ? "rgba(99,102,241,0.18)" : "transparent", border: page === n ? "1px solid rgba(99,102,241,0.35)" : "1px solid transparent", color: page === n ? "#a5b4fc" : "rgba(148,163,184,0.75)", padding: "5px 13px", borderRadius: "8px", fontSize: "13px", fontWeight: page === n ? "600" : "400", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.15s", position: "relative" }}>
+              {n}
+              {n === "Updates" && updates.length > 0 && (
+                <span style={{ position: "absolute", top: "3px", right: "3px", width: "6px", height: "6px", background: "#ef4444", borderRadius: "50%", animation: "blink 1.5s infinite" }} />
+              )}
             </button>
           ))}
-          <button onClick={() => setDarkMode(d => !d)}
-            style={{ padding: isMobile ? "5px 8px" : "5px 12px", borderRadius: 20, border: `1px solid ${t.border}`, cursor: "pointer", fontFamily: "inherit", fontSize: isMobile ? 13 : 12, background: "transparent", color: t.text, marginLeft: 2 }}>
-            {darkMode ? "☀️" : "🌙"}
-          </button>
         </div>
-      </header>
 
-      {/* BODY */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-
-        {/* MOBILE OVERLAY */}
-        {isMobile && sidebarOpen && (
-          <div onClick={() => setSidebarOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200 }} />
-        )}
-
-        {/* SIDEBAR */}
-        {(isDesktop || isTablet) ? (
-          <aside style={{ width: isTablet ? 220 : 260, flexShrink: 0, height: "100%", overflowY: "auto", padding: "16px 12px", borderRight: `1px solid ${t.border}`, background: t.surface, boxSizing: "border-box", scrollbarWidth: "thin" }}>
-            <SidebarContent />
-          </aside>
-        ) : (
-          <aside style={{ position: "absolute", top: 0, left: sidebarOpen ? 0 : "-105%", width: "82vw", maxWidth: 300, height: "100%", overflowY: "auto", padding: "16px 14px", background: t.surface, zIndex: 300, boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.2)" : "none", transition: "left 0.25s cubic-bezier(.4,0,.2,1)", boxSizing: "border-box" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: t.text }}>Filters & Search</span>
-              <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: t.subtext, fontSize: 18 }}>✕</button>
+        {/* User */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setDropdown(!dropdown)} style={{ display: "flex", alignItems: "center", gap: "9px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "6px 12px", cursor: "pointer", color: "#e2e8f0" }}>
+            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: "#fff" }}>
+              {user.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
             </div>
-            <SidebarContent />
-          </aside>
-        )}
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: "12px", fontWeight: "600" }}>{user.name.split(" ").slice(0, 2).join(" ")}</div>
+              <div style={{ fontSize: "10px", color: "rgba(148,163,184,0.7)" }}>{user.role}</div>
+            </div>
+            <span style={{ fontSize: "10px", opacity: 0.5 }}>▼</span>
+          </button>
+          {dropdown && (
+            <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 12px 40px rgba(15,23,42,0.15)", minWidth: "160px", overflow: "hidden", zIndex: 300 }}>
+              {[["👤 Profile", "Profile"], ["⚙️ Settings", "Settings"]].map(([label, pg]) => (
+                <button key={pg} onClick={() => { setPage(pg); setDropdown(false); }} style={{ display: "block", width: "100%", padding: "11px 16px", textAlign: "left", border: "none", background: "none", fontSize: "13px", color: "#374151", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: "500" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  {label}
+                </button>
+              ))}
+              <div style={{ height: "1px", background: "#f1f5f9", margin: "2px 0" }} />
+              <button onClick={() => { onLogout(); setDropdown(false); }} style={{ display: "block", width: "100%", padding: "11px 16px", textAlign: "left", border: "none", background: "none", fontSize: "13px", color: "#ef4444", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: "500" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                🚪 Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </nav>
+      <LiveTicker updates={updates} />
+    </>
+  );
+}
 
-        {/* MAIN CONTENT */}
-        <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "16px 16px", minWidth: 0, scrollbarWidth: "thin" }}>
-          {view === "search" && (
+/* ───────────────────────────────────────────────────────────────
+   AUTH PAGES
+─────────────────────────────────────────────────────────────── */
+function AuthPage({ onLogin }) {
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState({ name: "", email: "doctor@aura.com", password: "password123", confirm: "", role: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async () => {
+    setError(""); setLoading(true);
+    await new Promise(r => setTimeout(r, 700));
+    setLoading(false);
+
+    if (!form.email || !form.password) { setError("Please fill in all fields."); return; }
+    if (mode === "signup") {
+      if (!form.name) { setError("Please enter your name."); return; }
+      if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
+      onLogin({ name: form.name || "Dr. User", email: form.email, role: form.role || "Physician" });
+      return;
+    }
+    const match = CREDENTIALS.find(c => c.email === form.email && c.password === form.password);
+    if (!match) { setError("Invalid email or password."); return; }
+    onLogin(match);
+  };
+
+  const inputStyle = { width: "100%", padding: "11px 14px", border: "1.5px solid #e2e8f0", borderRadius: "10px", fontSize: "14px", fontFamily: "'Plus Jakarta Sans', sans-serif", background: "#f9fafb", color: "#1e293b", outline: "none", transition: "border-color 0.2s" };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+      <div style={{ width: "420px", background: "#fff", borderRadius: "20px", padding: "36px", boxShadow: "0 24px 64px rgba(0,0,0,0.35)" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px", justifyContent: "center" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: "800", color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>A</div>
+          <div>
+            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.12em" }}>AURA</div>
+            <div style={{ fontSize: "10px", color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Health Signal Intelligence</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a", marginBottom: "20px", textAlign: "center" }}>
+          {mode === "login" ? "Welcome back" : "Create account"}
+        </div>
+
+        {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", borderRadius: "9px", padding: "10px 14px", fontSize: "13px", marginBottom: "16px", fontWeight: "500" }}>{error}</div>}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {mode === "signup" && (
             <>
-              {/* Top bar */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 6 }}>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: t.text }}>
-                    {loading ? "Searching..." : `${results.length} medicine${results.length !== 1 ? "s" : ""} found`}
-                  </span>
-                  {query && <span style={{ color: t.subtext, fontSize: 12, marginLeft: 6 }}>for "{query}"</span>}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: t.subtext }}>Page {page}/{totalPages || 1}</span>
-                  <button onClick={() => {
-                    const lines = [`AURA Report — ${new Date().toLocaleString()}`, `Query: "${query || "All"}"`, `Results: ${results.length}`, "", ...results.slice(0, 20).map((m, i) => `${i + 1}. ${m.name} (${m.brand}) — ${m.category} — Risk: ${m.risk}\n   ${m.dosage}\n   ${m.uses.join(", ")}\n`)];
-                    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain" })); a.download = `aura-${Date.now()}.txt`; a.click();
-                  }} style={{ padding: "4px 10px", borderRadius: 8, border: `1px solid ${t.accent}`, cursor: "pointer", fontFamily: "inherit", fontSize: 11, background: "transparent", color: t.accent, fontWeight: 600 }}>⬇ Export</button>
-                </div>
-              </div>
-
-              {/* Loading skeletons */}
-              {loading && (
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? "100%" : "230px"}, 1fr))`, gap: 12 }}>
-                  {[1, 2, 3, 4, 5, 6].map(i => (
-                    <div key={i} style={{ background: t.card, borderRadius: 14, height: 170, border: `1px solid ${t.border}`, animation: "auraPulse 1.4s ease-in-out infinite", opacity: 0.6 }}>
-                      <style>{`@keyframes auraPulse{0%,100%{opacity:0.6}50%{opacity:0.3}}`}</style>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Cards Grid */}
-              {!loading && (
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? "100%" : isTablet ? "200px" : "230px"}, 1fr))`, gap: isMobile ? 10 : 12 }}>
-                  {paginatedResults.map(med => (
-                    <MedicineCard key={med.id} med={med} t={t} bookmarks={bookmarks} toggleBookmark={toggleBookmark} onClick={() => setSelected(med)} />
-                  ))}
-                  {paginatedResults.length === 0 && (
-                    <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "50px 20px", color: t.subtext }}>
-                      <div style={{ fontSize: 44, marginBottom: 10 }}>🔍</div>
-                      <div style={{ fontWeight: 700, fontSize: 17, color: t.text, marginBottom: 6 }}>No medicines found</div>
-                      <div style={{ fontSize: 13 }}>Try different keywords or clear filters</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && !loading && (
-                <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 20, flexWrap: "wrap" }}>
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                    style={{ padding: "7px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontFamily: "inherit", fontSize: 12, cursor: page === 1 ? "default" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>← Prev</button>
-                  {Array.from({ length: Math.min(totalPages, isMobile ? 5 : 7) }, (_, i) => i + 1).map(pg => (
-                    <button key={pg} onClick={() => setPage(pg)}
-                      style={{ padding: "7px 12px", borderRadius: 9, border: "none", background: page === pg ? t.accent : "transparent", color: page === pg ? "#fff" : t.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: page === pg ? 700 : 400, minWidth: 36 }}>{pg}</button>
-                  ))}
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                    style={{ padding: "7px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontFamily: "inherit", fontSize: 12, cursor: page === totalPages ? "default" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>Next →</button>
-                </div>
-              )}
+              <input placeholder="Full name" value={form.name} onChange={set("name")} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              <input placeholder="Role / Specialty" value={form.role} onChange={set("role")} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
             </>
           )}
+          <input placeholder="Email" type="email" value={form.email} onChange={set("email")} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+          <input placeholder="Password" type="password" value={form.password} onChange={set("password")} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+          {mode === "signup" && <input placeholder="Confirm password" type="password" value={form.confirm} onChange={set("confirm")} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />}
+        </div>
 
-          {view === "bookmarks" && (
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16, color: t.text }}>🔖 Saved Medicines ({bookmarks.length})</div>
-              {bookmarks.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 60, color: t.subtext }}>
-                  <div style={{ fontSize: 44, marginBottom: 10 }}>🔖</div>
-                  <div style={{ fontWeight: 700, fontSize: 17, color: t.text, marginBottom: 6 }}>No saved medicines</div>
-                  <div style={{ fontSize: 13 }}>Tap ♡ on any card to save it here</div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? "100%" : "230px"}, 1fr))`, gap: 12 }}>
-                  {MEDICINE_DB.filter(m => bookmarks.includes(m.id)).map(med => (
-                    <MedicineCard key={med.id} med={med} t={t} bookmarks={bookmarks} toggleBookmark={toggleBookmark} onClick={() => setSelected(med)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        <button onClick={submit} style={{ width: "100%", marginTop: "20px", padding: "13px", borderRadius: "11px", border: "none", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 4px 18px rgba(99,102,241,0.45)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", transition: "opacity 0.2s" }}
+          onMouseEnter={e => e.currentTarget.style.opacity = "0.92"}
+          onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+          {loading ? <><Spinner size={16} color="#fff" /> Processing…</> : (mode === "login" ? "Sign In" : "Create Account")}
+        </button>
 
-          {view === "insights" && (
-            <InsightsPanel t={t} piData={piData} catData={catData} isMobile={isMobile} />
-          )}
-        </main>
+        <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px", color: "#64748b" }}>
+          {mode === "login" ? <>No account? <button onClick={() => { setMode("signup"); setError(""); }} style={{ color: "#6366f1", background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "13px" }}>Create one</button></> : <>Have an account? <button onClick={() => { setMode("login"); setError(""); }} style={{ color: "#6366f1", background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "13px" }}>Sign in</button></>}
+        </div>
 
-        {/* RIGHT PANEL — desktop only */}
-        {isDesktop && (
-          <aside style={{ width: 220, flexShrink: 0, height: "100%", overflowY: "auto", padding: "16px 12px", borderLeft: `1px solid ${t.border}`, background: t.surface, boxSizing: "border-box", scrollbarWidth: "thin" }}>
-            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Risk Overview</div>
-            <ResponsiveContainer width="100%" height={130}>
-              <PieChart>
-                <Pie data={piData} cx="50%" cy="50%" innerRadius={30} outerRadius={55} dataKey="value">
-                  {piData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 16 }}>
-              {piData.map(d => (
-                <span key={d.name} style={{ fontSize: 10, display: "flex", alignItems: "center", gap: 3, color: t.subtext }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, display: "inline-block" }}></span>{d.name}
-                </span>
-              ))}
-            </div>
+        {mode === "login" && <div style={{ textAlign: "center", marginTop: "12px", fontSize: "11px", color: "#94a3b8" }}>Demo: doctor@aura.com / password123</div>}
+      </div>
+    </div>
+  );
+}
 
-            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: t.text, letterSpacing: "0.5px", textTransform: "uppercase" }}>Categories</div>
-            {TOP_CATEGORIES.slice(0, 8).map(([cat, count]) => (
-              <div key={cat} onClick={() => { setFilters(f => ({ ...f, category: cat })); setView("search"); }}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", cursor: "pointer", borderBottom: `1px solid ${t.border}`, fontSize: 11, transition: "color 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.color = t.accent}
-                onMouseLeave={e => e.currentTarget.style.color = t.text}>
-                <span style={{ flex: 1, paddingRight: 4, color: t.text, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{cat}</span>
-                <span style={{ background: "#dbeafe", color: "#1e40af", padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{count}</span>
-              </div>
-            ))}
-          </aside>
-        )}
+/* ───────────────────────────────────────────────────────────────
+   DASHBOARD PAGE
+─────────────────────────────────────────────────────────────── */
+function DashboardPage({ updates, updatesLoading }) {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  const analyze = async (t) => {
+    setAnalyzing(true); setVisible(false); setResult(null);
+    await new Promise(r => setTimeout(r, 1400));
+    setResult(getMockAnalysis(t)); setAnalyzing(false);
+    setTimeout(() => setVisible(true), 40);
+  };
+
+  const cfg = result ? RISK_CFG[result.risk_level] : null;
+  const sentimentColor = { negative: "#ef4444", neutral: "#f59e0b", positive: "#22c55e" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+      {/* Stat Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px" }}>
+        <StatCard label="Analyses Today" value="1,284" sub="↑ 8.2% from yesterday" accent="#6366f1" delay="card-enter-1" />
+        <StatCard label="High Risk Flagged" value="39" sub="Requires immediate review" accent="#ef4444" delay="card-enter-2" />
+        <StatCard label="Avg Confidence" value="91.4%" sub="Model accuracy score" accent="#22c55e" delay="card-enter-3" />
+        <StatCard label="AI Updates" value={updatesLoading ? "…" : updates.length} sub="Live intelligence alerts" accent="#f59e0b" delay="card-enter-4" />
       </div>
 
-      {/* MODAL */}
-      {selected && (
-        <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 10 : 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: t.surface, borderRadius: 18, maxWidth: 560, width: "100%", maxHeight: "88vh", overflow: "auto", padding: isMobile ? 18 : 26, position: "relative", boxShadow: "0 24px 64px rgba(0,0,0,0.3)", scrollbarWidth: "thin" }}>
-            <button onClick={() => setSelected(null)} style={{ position: "absolute", top: 14, right: 14, background: t.accentLight, border: "none", width: 30, height: 30, borderRadius: "50%", fontSize: 16, cursor: "pointer", color: t.subtext, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✕</button>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 18 }}>
-              <div style={{ width: 50, height: 50, borderRadius: 14, background: "linear-gradient(135deg, #1d4ed8, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>💊</div>
+      {/* Main 2-col */}
+      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "18px", alignItems: "start" }}>
+        {/* Input Panel */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={CARD} className="card-enter">
+            <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <h2 style={{ margin: "0 0 2px", fontWeight: 800, fontSize: 20, color: t.text }}>{selected.name}</h2>
-                <div style={{ color: t.subtext, fontSize: 13 }}>{selected.brand} · {selected.manufacturer}</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                  {riskBadge(selected.risk)}
-                  <span style={{ background: "#ede9fe", color: "#5b21b6", padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{selected.category}</span>
-                </div>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Patient Signal Input</div>
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>Clinical notes or patient-reported text</div>
               </div>
+              <Badge label="NLP v3.2" color="#0369a1" bg="#f0f9ff" border="#bae6fd" />
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {[["⭐ Rating", <Stars rating={selected.rating} />], ["📋 Reviews", selected.reviews.toLocaleString()], ["💊 Category", selected.category], ["🏭 Maker", selected.manufacturer || "N/A"]].map(([label, val]) => (
-                <div key={label} style={{ background: darkMode ? "#0f172a" : "#f8faff", borderRadius: 9, padding: 11, border: `1px solid ${t.border}` }}>
-                  <div style={{ fontSize: 11, color: t.subtext, marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: t.text }}>{val}</div>
-                </div>
-              ))}
-            </div>
-
-            {[["🩺 Used For", selected.uses.join(" · ")], ["💉 Dosage", selected.dosage]].map(([label, val]) => (
-              <div key={label} style={{ marginBottom: 13 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: t.text }}>{label}</div>
-                <div style={{ fontSize: 13, color: t.subtext, lineHeight: 1.6, background: darkMode ? "#0a0f1e" : "#f8faff", borderRadius: 9, padding: 11, border: `1px solid ${t.border}` }}>{val}</div>
-              </div>
-            ))}
-
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 7, color: t.text }}>⚠️ Side Effects</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {selected.sideEffects.map((se, i) => (
-                  <span key={i} style={{ background: "#fef2f2", color: "#991b1b", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, border: "1px solid #fecaca" }}>{se}</span>
+            <div style={{ padding: "14px 20px" }}>
+              <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Enter patient text or social media post…"
+                style={{ width: "100%", height: "150px", border: "1.5px solid #e2e8f0", borderRadius: "10px", padding: "12px 14px", fontSize: "13.5px", color: "#1e293b", background: "#fafafa", resize: "none", outline: "none", fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.6, boxSizing: "border-box", transition: "border-color 0.2s" }}
+                onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              <div style={{ marginTop: "10px" }}>
+                <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "7px" }}>Quick samples</div>
+                {SAMPLE_TEXTS.map((s, i) => (
+                  <button key={i} onClick={() => setText(s.text)} style={{ display: "flex", width: "100%", alignItems: "center", gap: "7px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "7px", padding: "7px 10px", textAlign: "left", fontSize: "12px", color: "#475569", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: "5px", transition: "all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#eef2ff"; e.currentTarget.style.color = "#4f46e5"; e.currentTarget.style.borderColor = "#c7d2fe"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#e2e8f0"; }}>
+                    <span style={{ opacity: 0.4, fontSize: "10px" }}>↗</span>{s.label}
+                  </button>
                 ))}
               </div>
             </div>
-
-            <div style={{ padding: 13, borderRadius: 10, background: selected.risk === "HIGH" ? "#fef2f2" : selected.risk === "MEDIUM" ? "#fffbeb" : "#ecfdf5", border: `1px solid ${RISK_COLORS[selected.risk]}40`, fontSize: 12, color: t.text, lineHeight: 1.5 }}>
-              <strong>⚕️ Clinical Note:</strong>{" "}
-              {selected.risk === "HIGH" ? "This medicine requires close medical supervision. Do not self-medicate." : selected.risk === "MEDIUM" ? "Use with caution. Consult your doctor before use." : "Generally safe and well-tolerated. Still consult a healthcare provider."}
+            <div style={{ padding: "0 20px 18px" }}>
+              <button onClick={() => text.trim() && analyze(text)} disabled={analyzing || !text.trim()} style={{ width: "100%", padding: "13px", borderRadius: "11px", border: "none", background: text.trim() && !analyzing ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "#e2e8f0", color: text.trim() && !analyzing ? "#fff" : "#94a3b8", fontSize: "13.5px", fontWeight: "700", cursor: text.trim() && !analyzing ? "pointer" : "not-allowed", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: text.trim() && !analyzing ? "0 4px 18px rgba(99,102,241,0.4)" : "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", transition: "all 0.2s" }}>
+                {analyzing ? <><Spinner size={15} color="#fff" /> Analyzing Signal…</> : "⚡ Analyze Health Signal"}
+              </button>
             </div>
           </div>
+
+          {/* AI Updates mini panel */}
+          <div style={{ ...CARD, padding: "16px 18px" }} className="card-enter">
+            <div style={{ fontSize: "12px", fontWeight: "700", color: "#0f172a", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ width: "7px", height: "7px", background: "#ef4444", borderRadius: "50%", display: "inline-block", animation: "blink 1.5s infinite" }} />
+              Live AI Intelligence
+            </div>
+            {updatesLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {[1, 2, 3].map(i => <ShimmerBlock key={i} h={32} mb={0} />)}
+              </div>
+            ) : updates.slice(0, 3).map((u, i) => (
+              <div key={i} style={{ background: UPDATE_BG[u.emoji] || "#f8fafc", border: `1px solid ${UPDATE_BORDER[u.emoji] || "#e2e8f0"}`, borderRadius: "8px", padding: "8px 11px", marginBottom: "6px", fontSize: "11.5px", color: "#374151", lineHeight: 1.45 }}>
+                <span style={{ marginRight: "5px" }}>{u.emoji}</span>{u.text}
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+
+        {/* Result Panel */}
+        <div>
+          {analyzing ? (
+            <div style={CARD}>
+              <div style={{ padding: "24px" }}>
+                <div style={{ display: "flex", gap: "12px", marginBottom: "18px" }}>
+                  <ShimmerBlock h={48} w="48px" mb={0} />
+                  <div style={{ flex: 1 }}>
+                    <ShimmerBlock h={20} w="55%" mb={8} />
+                    <ShimmerBlock h={14} w="38%" mb={0} />
+                  </div>
+                </div>
+                {[100, 80, 90, 70].map((w, i) => <ShimmerBlock key={i} h={13} w={`${w}%`} />)}
+              </div>
+            </div>
+          ) : !result ? (
+            <div style={{ ...CARD, padding: "56px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", border: "2px dashed #e2e8f0", background: "#fafbfc", minHeight: "340px" }}>
+              <div style={{ fontSize: "44px", opacity: 0.15 }}>◎</div>
+              <div style={{ fontSize: "14px", color: "#94a3b8", textAlign: "center", lineHeight: 1.6 }}>Enter patient text and click<br /><strong style={{ color: "#6366f1" }}>Analyze Health Signal</strong> to begin</div>
+            </div>
+          ) : (
+            <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(14px)", transition: "all 0.4s cubic-bezier(0.16,1,0.3,1)", display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Risk card */}
+              <div style={{ ...CARD, border: `1px solid ${cfg.border}`, boxShadow: `0 4px 24px ${cfg.color}20` }}>
+                <div style={{ background: cfg.bg, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${cfg.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: "50px", height: "50px", borderRadius: "13px", background: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "#fff", animation: result.risk_level === "HIGH" ? "pulse-ring 2s infinite" : "none" }}>{cfg.icon}</div>
+                    <div>
+                      <div style={{ fontSize: "10px", color: cfg.text, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.1em" }}>Risk Assessment</div>
+                      <div style={{ fontSize: "28px", fontWeight: "800", color: cfg.text, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.1 }}>{result.risk_level}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8" }}>Confidence</div>
+                    <div style={{ fontSize: "26px", fontWeight: "800", color: "#0f172a", fontFamily: "'JetBrains Mono', monospace" }}>{result.confidence}%</div>
+                    <div style={{ width: "80px", height: "4px", background: "#e2e8f0", borderRadius: "2px", marginTop: "5px" }}>
+                      <div style={{ width: `${result.confidence}%`, height: "100%", background: cfg.color, borderRadius: "2px", transition: "width 0.8s ease" }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "16px 22px" }}>
+                  <div style={{ marginBottom: "14px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "7px" }}>Detected Symptoms</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {result.symptoms.map((s, i) => <Badge key={i} label={`◦ ${s}`} color="#0369a1" bg="#f0f9ff" border="#bae6fd" />)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "10px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "7px" }}>Sentiment Analysis</div>
+                    <Badge label={result.sentiment.toUpperCase()} color={sentimentColor[result.sentiment]} bg={`${sentimentColor[result.sentiment]}18`} border={`${sentimentColor[result.sentiment]}44`} />
+                  </div>
+                </div>
+              </div>
+              {/* Explanation */}
+              <div style={{ ...CARD, padding: "16px 22px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a", marginBottom: "13px", display: "flex", alignItems: "center", gap: "7px" }}>◈ Why this result?</div>
+                {result.reason.map((r, i) => (
+                  <div key={i} style={{ display: "flex", gap: "11px", alignItems: "flex-start", marginBottom: "9px" }}>
+                    <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#fff", fontWeight: "700", flexShrink: 0, marginTop: "1px", fontFamily: "'JetBrains Mono', monospace" }}>{i + 1}</div>
+                    <span style={{ fontSize: "13px", color: "#475569", lineHeight: 1.5 }}>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Analytics Strip */}
+      <div style={{ ...CARD, overflow: "hidden" }} className="card-enter">
+        <div style={{ padding: "16px 22px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Analytics Overview</div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>Last 7 days · 248 analyses processed</div>
+          </div>
+          <Badge label="↑ 12.4% vs last week" color="#16a34a" bg="#f0fdf4" border="#bbf7d0" />
+        </div>
+        <div style={{ padding: "22px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "14px" }}>Symptom Frequency</div>
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={SYMPTOM_DATA} barCategoryGap="32%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "14px" }}>Risk Distribution</div>
+            <ResponsiveContainer width="100%" height={140}>
+              <PieChart>
+                <Pie data={RISK_PIE} cx="50%" cy="50%" innerRadius={44} outerRadius={66} paddingAngle={3} dataKey="value">
+                  {RISK_PIE.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "6px" }}>
+              {RISK_PIE.map(d => <div key={d.name} style={{ display: "flex", alignItems: "center", gap: "4px" }}><div style={{ width: "8px", height: "8px", borderRadius: "2px", background: d.color }} /><span style={{ fontSize: "11px", color: "#64748b" }}>{d.name}</span></div>)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "14px" }}>Sentiment Trend</div>
+            <ResponsiveContainer width="100%" height={170}>
+              <AreaChart data={SENTIMENT_TREND}>
+                <defs>
+                  <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
+                  <linearGradient id="ng" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2} fill="url(#pg)" name="Positive" />
+                <Area type="monotone" dataKey="neutral" stroke="#f59e0b" strokeWidth={2} fill="none" strokeDasharray="4 3" name="Neutral" />
+                <Area type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} fill="url(#ng)" name="Negative" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── MEDICINE CARD ────────────────────────────────────────────────────────────
-function MedicineCard({ med, t, bookmarks, toggleBookmark, onClick }) {
-  const [hovered, setHovered] = useState(false);
+/* ───────────────────────────────────────────────────────────────
+   MEDICINES PAGE
+─────────────────────────────────────────────────────────────── */
+function MedicinesPage() {
+  const [search, setSearch] = useState("");
+  const filtered = MEDICINES.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ background: t.card, border: `1px solid ${hovered ? t.accent : t.border}`, borderRadius: 14, padding: 15, cursor: "pointer", transition: "all 0.18s", transform: hovered ? "translateY(-2px)" : "none", boxShadow: hovered ? `0 8px 28px rgba(37,99,235,0.12)` : "0 1px 4px rgba(0,0,0,0.04)", position: "relative", minHeight: 150 }}>
-      <button onClick={e => { e.stopPropagation(); toggleBookmark(med.id); }}
-        style={{ position: "absolute", top: 12, right: 12, background: bookmarks.includes(med.id) ? "#eff4ff" : "transparent", border: bookmarks.includes(med.id) ? `1px solid ${t.accent}` : "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 15, color: bookmarks.includes(med.id) ? t.accent : t.subtext, transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {bookmarks.includes(med.id) ? "♥" : "♡"}
-      </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
+        <StatCard label="Total Medicines" value="6" sub="In current database" accent="#6366f1" delay="card-enter-1" />
+        <StatCard label="Safe to Use" value="3" sub="LOW risk medicines" accent="#22c55e" delay="card-enter-2" />
+        <StatCard label="Total Reviews" value="1,815" sub="Across all medicines" accent="#f59e0b" delay="card-enter-3" />
+      </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #dbeafe, #ede9fe)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>💊</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 30 }}>{med.name}</div>
-          <div style={{ color: t.subtext, fontSize: 11, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{med.brand}</div>
+      <div style={CARD} className="card-enter">
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Medicine Database</div>
+          <input placeholder="Search medicines…" value={search} onChange={e => setSearch(e.target.value)} style={{ padding: "7px 12px", border: "1.5px solid #e2e8f0", borderRadius: "9px", fontSize: "13px", fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#1e293b", background: "#f9fafb", outline: "none", width: "200px" }} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
         </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 9 }}>
-        {riskBadge(med.risk)}
-        <span style={{ background: "#ede9fe", color: "#5b21b6", padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{med.category}</span>
-      </div>
-
-      <div style={{ fontSize: 11, color: t.subtext, marginBottom: 10, lineHeight: 1.5 }}>
-        <span style={{ fontWeight: 600, color: t.text }}>For:</span>{" "}
-        {med.uses.slice(0, 3).join(", ")}{med.uses.length > 3 ? ` +${med.uses.length - 3}` : ""}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Stars rating={med.rating} />
-        <span style={{ fontSize: 10, color: t.subtext }}>{med.reviews.toLocaleString()} reviews</span>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["Medicine", "Reviews", "Suitability", "Rating", "Risk Status"].map(h => (
+                  <th key={h} style={{ padding: "11px 20px", textAlign: "left", fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: "1px solid #f1f5f9" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m, i) => {
+                const cfg = RISK_CFG[m.risk];
+                return (
+                  <tr key={m.id} style={{ borderBottom: "1px solid #f8fafc", transition: "background 0.15s", cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "13px 20px", fontSize: "14px", fontWeight: "600", color: "#0f172a" }}>{m.name}</td>
+                    <td style={{ padding: "13px 20px", fontSize: "13px", color: "#475569", fontFamily: "'JetBrains Mono', monospace" }}>{m.reviews.toLocaleString()}</td>
+                    <td style={{ padding: "13px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "70px", height: "5px", background: "#e2e8f0", borderRadius: "3px" }}>
+                          <div style={{ width: `${m.suitability}%`, height: "100%", background: cfg.color, borderRadius: "3px" }} />
+                        </div>
+                        <span style={{ fontSize: "12px", fontWeight: "600", color: cfg.text, fontFamily: "'JetBrains Mono', monospace" }}>{m.suitability}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "13px 20px", fontSize: "13px", color: "#f59e0b", fontFamily: "'JetBrains Mono', monospace" }}>{"★".repeat(Math.round(m.rating))} {m.rating}</td>
+                    <td style={{ padding: "13px 20px" }}>
+                      <Badge label={m.risk === "LOW" ? "✓ Safe" : m.risk === "MEDIUM" ? "◉ Caution" : "⚠ High Risk"} color={cfg.text} bg={cfg.bg} border={cfg.border} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── INSIGHTS PANEL ───────────────────────────────────────────────────────────
-function InsightsPanel({ t, piData, catData, isMobile }) {
-  const avgRating = (MEDICINE_DB.reduce((s, m) => s + m.rating, 0) / MEDICINE_DB.length).toFixed(1);
-  const totalReviews = MEDICINE_DB.reduce((s, m) => s + m.reviews, 0);
+/* ───────────────────────────────────────────────────────────────
+   REVIEWS PAGE
+─────────────────────────────────────────────────────────────── */
+function ReviewsPage() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div style={CARD} className="card-enter">
+        <div style={{ padding: "16px 22px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Weekly Review Sentiment Trend</div>
+          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>Positive / Neutral / Negative reviews over 7 days</div>
+        </div>
+        <div style={{ padding: "20px 22px" }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={SENTIMENT_TREND}>
+              <defs>
+                <linearGradient id="rp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
+                <linearGradient id="rn" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0} /></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2.5} fill="url(#rp)" name="Positive" />
+              <Area type="monotone" dataKey="neutral"  stroke="#f59e0b" strokeWidth={2}   fill="none" strokeDasharray="5 3" name="Neutral" />
+              <Area type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2}   fill="url(#rn)" name="Negative" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
+        {MEDICINES.map((m, i) => {
+          const cfg = RISK_CFG[m.risk];
+          return (
+            <div key={m.id} style={{ ...CARD, padding: "18px", borderTop: `3px solid ${cfg.color}`, cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s" }} className={`card-enter card-enter-${(i % 4) + 1}`}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(15,23,42,0.12)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(15,23,42,0.06)"; }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                <div style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a" }}>{m.name}</div>
+                <Badge label={m.risk} color={cfg.text} bg={cfg.bg} border={cfg.border} />
+              </div>
+              <div style={{ fontSize: "22px", color: "#f59e0b", marginBottom: "8px" }}>{"★".repeat(Math.round(m.rating))}<span style={{ fontSize: "13px", color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}> {m.rating}</span></div>
+              <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "10px" }}>Side effects: {m.effects.join(", ")}</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8", marginBottom: "3px" }}>Suitable</div>
+                  <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "3px" }}><div style={{ width: `${m.suitability}%`, height: "100%", background: "#22c55e", borderRadius: "3px" }} /></div>
+                  <div style={{ fontSize: "11px", color: "#22c55e", fontWeight: "600", marginTop: "2px" }}>{m.suitability}%</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8", marginBottom: "3px" }}>Not suitable</div>
+                  <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "3px" }}><div style={{ width: `${100 - m.suitability}%`, height: "100%", background: "#ef4444", borderRadius: "3px" }} /></div>
+                  <div style={{ fontSize: "11px", color: "#ef4444", fontWeight: "600", marginTop: "2px" }}>{100 - m.suitability}%</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   ANALYTICS PAGE
+─────────────────────────────────────────────────────────────── */
+function AnalyticsPage() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px" }}>
+        <div style={CARD} className="card-enter card-enter-1">
+          <div style={{ padding: "16px 22px", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Suitability Distribution</div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>Risk level breakdown across all medicines</div>
+          </div>
+          <div style={{ padding: "20px 22px" }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={RISK_PIE} cx="50%" cy="50%" outerRadius={88} paddingAngle={4} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine>
+                  {RISK_PIE.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={CARD} className="card-enter card-enter-2">
+          <div style={{ padding: "16px 22px", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Reviews by Medicine</div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>Total review count per medicine</div>
+          </div>
+          <div style={{ padding: "20px 22px" }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={BAR_DATA} barCategoryGap="35%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="reviews" fill="#6366f1" radius={[5, 5, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div style={CARD} className="card-enter card-enter-3">
+        <div style={{ padding: "16px 22px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>7-Day Sentiment Trend</div>
+        </div>
+        <div style={{ padding: "20px 22px" }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={SENTIMENT_TREND}>
+              <defs>
+                <linearGradient id="ap" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} /><stop offset="95%" stopColor="#6366f1" stopOpacity={0} /></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2} fill="none" name="Positive" />
+              <Area type="monotone" dataKey="neutral"  stroke="#f59e0b" strokeWidth={2} fill="none" name="Neutral" />
+              <Area type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} fill="none" name="Negative" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   AI HEALTH UPDATES PAGE
+─────────────────────────────────────────────────────────────── */
+function UpdatesPage({ updates, loading, onRefresh, lastFetched }) {
+  const typeCount = { Trend: 0, Warning: 0, Outbreak: 0, Drug: 0 };
+  updates.forEach(u => { if (typeCount[u.type] !== undefined) typeCount[u.type]++; });
+
+  const countCards = [
+    { label: "Trends", val: typeCount.Trend,    color: "#0ea5e9", bg: "#f0f9ff", border: "#bae6fd" },
+    { label: "Warnings",val: typeCount.Warning, color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
+    { label: "Outbreaks",val: typeCount.Outbreak,color: "#8b5cf6", bg: "#f5f3ff", border: "#ddd6fe" },
+    { label: "Drug Alerts",val: typeCount.Drug, color: "#10b981", bg: "#f0fdf4", border: "#bbf7d0" },
+  ];
 
   return (
-    <div>
-      <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 18, color: t.text }}>📊 Database Insights</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* Header strip */}
+      <div style={{ ...CARD, padding: "20px 24px", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", border: "none" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "5px" }}>
+              <span style={{ width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%", display: "inline-block", animation: "blink 1.5s infinite" }} />
+              <span style={{ fontSize: "16px", fontWeight: "800", color: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>AI Health Intelligence Feed</span>
+              <span style={{ fontSize: "10px", background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", borderRadius: "5px", padding: "2px 7px", fontWeight: "600", fontFamily: "'JetBrains Mono', monospace" }}>LIVE</span>
+            </div>
+            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+              Powered by Claude AI · Analyzing news, health reports, and public data
+              {lastFetched && <span> · Last updated {lastFetched}</span>}
+            </div>
+          </div>
+          <button onClick={onRefresh} disabled={loading} style={{ display: "flex", alignItems: "center", gap: "7px", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.4)", color: "#a5b4fc", padding: "9px 16px", borderRadius: "9px", cursor: loading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "'Plus Jakarta Sans', sans-serif", opacity: loading ? 0.6 : 1, transition: "all 0.15s" }}>
+            {loading ? <Spinner size={14} color="#a5b4fc" /> : "↻"} {loading ? "Fetching…" : "Refresh"}
+          </button>
+        </div>
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 10, marginBottom: 16 }}>
-        {[
-          ["Total", MEDICINE_DB.length, "💊", "#2563eb"],
-          ["Safe", MEDICINE_DB.filter(m => m.risk === "LOW").length, "✓", "#059669"],
-          ["Avg Rating", avgRating, "⭐", "#d97706"],
-          ["Reviews", (totalReviews / 1000).toFixed(1) + "K", "📋", "#7c3aed"],
-        ].map(([label, val, icon, col]) => (
-          <div key={label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-            <div style={{ fontSize: 20, marginBottom: 3 }}>{icon}</div>
-            <div style={{ fontWeight: 800, fontSize: 20, color: col }}>{val}</div>
-            <div style={{ fontSize: 11, color: t.subtext, marginTop: 2 }}>{label}</div>
+      {/* Type counters */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+        {countCards.map((c, i) => (
+          <div key={c.label} style={{ ...CARD, padding: "14px 18px", borderLeft: `3px solid ${c.color}` }} className={`card-enter card-enter-${i + 1}`}>
+            <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "5px" }}>{c.label}</div>
+            <div style={{ fontSize: "28px", fontWeight: "800", color: c.color, fontFamily: "'JetBrains Mono', monospace" }}>{c.val}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
-        <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14, color: t.text }}>Risk Distribution</div>
-          <ResponsiveContainer width="100%" height={150}>
-            <PieChart>
-              <Pie data={piData} cx="50%" cy="50%" innerRadius={35} outerRadius={62} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false} fontSize={10}>
-                {piData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 6 }}>
-            {piData.map(d => <span key={d.name} style={{ fontSize: 10, color: t.subtext, display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, display: "inline-block" }}></span>{d.name}</span>)}
+      {/* Feed */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ ...CARD, padding: "18px 22px" }}>
+              <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                <ShimmerBlock h={40} w="40px" mb={0} />
+                <div style={{ flex: 1 }}>
+                  <ShimmerBlock h={16} w="25%" mb={8} />
+                  <ShimmerBlock h={13} w="90%" mb={4} />
+                  <ShimmerBlock h={13} w="70%" mb={0} />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : updates.map((u, i) => (
+          <div key={i} style={{ ...CARD, padding: "18px 22px", borderLeft: `4px solid ${UPDATE_COLORS[u.emoji] || "#6366f1"}`, background: UPDATE_BG[u.emoji] || "#fff", border: `1px solid ${UPDATE_BORDER[u.emoji] || "#e2e8f0"}`, borderLeft: `4px solid ${UPDATE_COLORS[u.emoji] || "#6366f1"}`, animation: `slideInLeft 0.35s ease both`, animationDelay: `${i * 0.07}s` }}>
+            <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: `${UPDATE_COLORS[u.emoji] || "#6366f1"}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>{u.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <Badge label={u.type} color={UPDATE_COLORS[u.emoji] || "#6366f1"} bg={`${UPDATE_COLORS[u.emoji]}18` || "#f8fafc"} border={`${UPDATE_COLORS[u.emoji]}40` || "#e2e8f0"} />
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>AI-generated · Just now</span>
+                </div>
+                <div style={{ fontSize: "14px", color: "#1e293b", lineHeight: 1.55, fontWeight: "500" }}>{u.text}</div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14, color: t.text }}>Top Categories</div>
-          <ResponsiveContainer width="100%" height={150}>
-            <BarChart data={catData} layout="vertical" margin={{ left: 0, right: 10 }}>
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: t.subtext }} width={65} />
-              <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        ))}
       </div>
 
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: t.text }}>Most Covered Symptoms</div>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap: 8 }}>
-          {TOP_SYMPTOMS.map(([sym, count]) => (
-            <div key={sym} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${t.border}`, fontSize: 12 }}>
-              <span style={{ color: t.text, textTransform: "capitalize" }}>{sym}</span>
-              <span style={{ fontWeight: 700, color: "#4f46e5", fontSize: 11 }}>{count}</span>
+      <div style={{ textAlign: "center", fontSize: "11px", color: "#94a3b8", padding: "4px 0 12px" }}>
+        Updates generated by Claude AI (claude-sonnet-4-20250514) · For informational purposes only · Not a substitute for clinical judgment
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   PROFILE PAGE
+─────────────────────────────────────────────────────────────── */
+function ProfilePage({ user, setUser }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ name: user.name, email: user.email, role: user.role });
+
+  const save = () => { setUser({ ...user, ...form }); setEditing(false); };
+  const cancel = () => { setForm({ name: user.name, email: user.email, role: user.role }); setEditing(false); };
+
+  const inputStyle = { width: "100%", padding: "10px 13px", border: "1.5px solid #e2e8f0", borderRadius: "9px", fontSize: "13.5px", fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#1e293b", background: "#f9fafb", outline: "none" };
+
+  return (
+    <div style={{ maxWidth: "560px", margin: "0 auto" }}>
+      <div style={CARD} className="card-enter">
+        <div style={{ padding: "28px 28px 20px", display: "flex", flexDirection: "column", alignItems: "center", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: "800", color: "#fff", marginBottom: "14px", boxShadow: "0 4px 18px rgba(99,102,241,0.3)" }}>
+            {user.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+          </div>
+          {!editing ? (
+            <>
+              <div style={{ fontSize: "19px", fontWeight: "700", color: "#0f172a" }}>{user.name}</div>
+              <div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "4px" }}>{user.role}</div>
+              <div style={{ fontSize: "13px", color: "#6366f1", marginTop: "2px" }}>{user.email}</div>
+            </>
+          ) : null}
+        </div>
+        <div style={{ padding: "22px 28px" }}>
+          {editing ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div><div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Full Name</div><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div><div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</div><input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div><div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Role / Specialty</div><input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={inputStyle} onFocus={e => e.target.style.borderColor = "#6366f1"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
+                <button onClick={save} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "#fff", fontSize: "13.5px", fontWeight: "700", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Save Changes</button>
+                <button onClick={cancel} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: "13.5px", fontWeight: "600", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancel</button>
+              </div>
             </div>
-          ))}
+          ) : (
+            <button onClick={() => setEditing(true)} style={{ width: "100%", padding: "11px", borderRadius: "10px", border: "1.5px solid #6366f1", background: "#fff", color: "#6366f1", fontSize: "13.5px", fontWeight: "700", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#eef2ff"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
+              ✏ Edit Profile
+            </button>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   SETTINGS PAGE
+─────────────────────────────────────────────────────────────── */
+function SettingsPage() {
+  const [settings, setSettings] = useState({ emailHigh: true, weeklyReview: false, shareData: false, twoFA: true });
+  const toggle = k => setSettings(s => ({ ...s, [k]: !s[k] }));
+
+  const Toggle = ({ k }) => (
+    <div onClick={() => toggle(k)} style={{ width: "42px", height: "22px", borderRadius: "11px", background: settings[k] ? "#6366f1" : "#d1d5db", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+      <div style={{ position: "absolute", width: "18px", height: "18px", background: "#fff", borderRadius: "50%", top: "2px", left: settings[k] ? "22px" : "2px", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }} />
+    </div>
+  );
+
+  const Section = ({ title, items }) => (
+    <div style={CARD} className="card-enter">
+      <div style={{ padding: "14px 22px", borderBottom: "1px solid #f1f5f9", fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>{title}</div>
+      <div style={{ padding: "6px 0" }}>
+        {items.map(item => (
+          <div key={item.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #f8fafc" }}>
+            <div>
+              <div style={{ fontSize: "13.5px", fontWeight: "600", color: "#0f172a" }}>{item.label}</div>
+              <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{item.sub}</div>
+            </div>
+            <Toggle k={item.k} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: "600px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Section title="🔔 Notifications" items={[
+        { k: "emailHigh", label: "Email Alerts for High-Risk Medicines", sub: "Receive email when HIGH risk is detected" },
+        { k: "weeklyReview", label: "Weekly Medicine Review Summary", sub: "Weekly digest of all medicine reviews" },
+      ]} />
+      <Section title="🔒 Privacy & Security" items={[
+        { k: "shareData", label: "Share Anonymous Usage Data", sub: "Help improve AURA with anonymized analytics" },
+        { k: "twoFA", label: "Two-Factor Authentication", sub: "Add an extra layer of account security" },
+      ]} />
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   ROOT APP
+─────────────────────────────────────────────────────────────── */
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [page, setPage] = useState("Dashboard");
+  const [updates, setUpdates] = useState([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [lastFetched, setLastFetched] = useState(null);
+
+  const loadUpdates = useCallback(async () => {
+    setUpdatesLoading(true);
+    try {
+      const data = await fetchAIHealthUpdates();
+      setUpdates(data);
+      setLastFetched(new Date().toLocaleTimeString());
+    } catch {
+      setUpdates(FALLBACK_UPDATES);
+      setLastFetched(new Date().toLocaleTimeString() + " (cached)");
+    }
+    setUpdatesLoading(false);
+  }, []);
+
+  useEffect(() => { if (user) loadUpdates(); }, [user]);
+
+  if (!user) return (
+    <>
+      <style>{GLOBAL_STYLE}</style>
+      <AuthPage onLogin={u => { setUser(u); setPage("Dashboard"); }} />
+    </>
+  );
+
+  const PAGES = {
+    Dashboard: <DashboardPage updates={updates} updatesLoading={updatesLoading} />,
+    Medicines:  <MedicinesPage />,
+    Reviews:    <ReviewsPage />,
+    Analytics:  <AnalyticsPage />,
+    Updates:    <UpdatesPage updates={updates} loading={updatesLoading} onRefresh={loadUpdates} lastFetched={lastFetched} />,
+    Profile:    <ProfilePage user={user} setUser={setUser} />,
+    Settings:   <SettingsPage />,
+  };
+
+  return (
+    <>
+      <style>{GLOBAL_STYLE}</style>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <Navbar page={page} setPage={setPage} user={user} onLogout={() => setUser(null)} updates={updates} />
+        <div style={{ flex: 1, padding: "24px 28px 32px", maxWidth: "1320px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+          {PAGES[page] || PAGES.Dashboard}
+        </div>
+        <footer style={{ textAlign: "center", padding: "12px", fontSize: "11px", color: "#94a3b8", borderTop: "1px solid #e8eef4", background: "#fff" }}>
+          AURA v2.0 · AI-Powered Health Signal Intelligence · For clinical decision support only
+        </footer>
+      </div>
+    </>
   );
 }
