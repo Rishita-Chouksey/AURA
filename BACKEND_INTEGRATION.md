@@ -4,7 +4,7 @@
 This frontend is now connected to the AURA backend for analyzing medical text data for sentiment, risk levels, and entity extraction.
 
 ## Backend Repository
-Your team's backend: https://github.com/SHREYA08006/AURA
+backend: https://github.com/SHREYA08006/AURA
 
 ## Setup Instructions
 
@@ -182,20 +182,9 @@ The backend should return responses in this format:
 4. Check browser console for detailed error messages
 
 ### CORS Errors
-If you see CORS errors, the backend needs to handle CORS:
+If CORS errors, the backend needs to handle CORS:
 ```python
 # Backend should include CORS headers or use Flask-CORS
 from flask_cors import CORS
 CORS(app)
 ```
-
-## Next Steps
-1. ✓ Backend integrated
-2. ✓ Light theme applied
-3. Replace mock data with real backend calls
-4. Update components to use `auraAPI` functions
-5. Implement real-time updates
-6. Add authentication if needed
-
-## Support
-For backend issues, refer to: https://github.com/SHREYA08006/AURA
