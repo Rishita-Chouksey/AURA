@@ -1,0 +1,838 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Area, AreaChart, LineChart, Line, Legend
+} from "recharts";
+
+// ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@300;400;500;600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #f8fafc; font-family: 'Manrope', sans-serif; color: #1e293b; min-height: 100vh; }
+    input, textarea, select, button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.7); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
+    @keyframes glow { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
+    @keyframes borderRotate { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+    .page-enter { animation: fadeIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
+    .slide-enter { animation: slideInLeft 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+    .nav-item { transition: all 0.2s ease; }
+    .nav-item:hover { background: rgba(99,102,241,0.08) !important; color: #4f46e5 !important; }
+    .nav-item.active { background: rgba(99,102,241,0.12) !important; color: #6366f1 !important; border-color: rgba(99,102,241,0.5) !important; }
+
+    .btn-primary { transition: all 0.25s ease; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(99,102,241,0.3) !important; }
+    .btn-primary:active { transform: translateY(0); }
+
+    .card { transition: all 0.25s ease; }
+    .card:hover { transform: translateY(-2px); border-color: rgba(99,102,241,0.4) !important; }
+
+    .sidebar-item { transition: all 0.2s ease; cursor: pointer; }
+    .sidebar-item:hover { background: rgba(99,102,241,0.08) !important; color: #4f46e5 !important; }
+    .sidebar-item.active { background: rgba(99,102,241,0.15) !important; border-left: 2px solid #6366f1 !important; color: #6366f1 !important; }
+
+    input:focus, textarea:focus { outline: none; border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important; }
+
+    .dropdown-menu { animation: scaleIn 0.18s cubic-bezier(0.16,1,0.3,1) forwards; transform-origin: top right; }
+
+    .table-row { transition: background 0.15s ease; }
+    .table-row:hover { background: rgba(99,102,241,0.04) !important; }
+
+    @media (max-width: 768px) {
+      .sidebar-desktop { display: none !important; }
+      .main-content { margin-left: 0 !important; }
+      .stats-grid { grid-template-columns: 1fr 1fr !important; }
+      .main-grid { grid-template-columns: 1fr !important; }
+      .charts-grid { grid-template-columns: 1fr !important; }
+      .top-nav-links { display: none !important; }
+    }
+  `}</style>
+);
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const COLORS = {
+  primary: "#6366f1",
+  primaryLight: "#818cf8",
+  primaryDark: "#4f46e5",
+  purple: "#8b5cf6",
+  bg: "#f8fafc",
+  bgCard: "#ffffff",
+  bgCardHover: "#f1f5f9",
+  bgCardBorder: "rgba(99,102,241,0.1)",
+  bgCardBorderHover: "rgba(99,102,241,0.3)",
+  text: "#1e293b",
+  textMuted: "#64748b",
+  textDim: "#94a3b8",
+  success: "#10b981",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  info: "#06b6d4",
+};
+
+const RISK_CONFIG = {
+  HIGH: { color: COLORS.danger, bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.3)", icon: "⚠", label: "High" },
+  MEDIUM: { color: COLORS.warning, bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.3)", icon: "◉", label: "Medium" },
+  LOW: { color: COLORS.success, bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.3)", icon: "✓", label: "Low" },
+};
+
+// ─── MOCK DATA ────────────────────────────────────────────────────────────────
+const PATIENTS_DATA = [
+  { id: "P-0041", name: "Aria Sharma", age: 34, symptoms: ["severe headache", "nausea", "blurred vision"], risk: "HIGH", status: "Critical", last: "2 min ago", avatar: "AS" },
+  { id: "P-0038", name: "Marcus Chen", age: 52, symptoms: ["chest tightness", "dizziness", "shortness of breath"], risk: "HIGH", status: "Monitoring", last: "8 min ago", avatar: "MC" },
+  { id: "P-0035", name: "Priya Patel", age: 28, symptoms: ["mild fever", "fatigue", "sore throat"], risk: "LOW", status: "Stable", last: "22 min ago", avatar: "PP" },
+  { id: "P-0033", name: "Jordan Lee", age: 61, symptoms: ["dizziness", "nausea", "chest pain"], risk: "MEDIUM", status: "Monitoring", last: "1 hr ago", avatar: "JL" },
+  { id: "P-0030", name: "Sofia Torres", age: 45, symptoms: ["fatigue", "joint pain", "fever"], risk: "MEDIUM", status: "Under Review", last: "2 hr ago", avatar: "ST" },
+  { id: "P-0028", name: "Ethan Brooks", age: 19, symptoms: ["mild headache", "runny nose"], risk: "LOW", status: "Stable", last: "3 hr ago", avatar: "EB" },
+  { id: "P-0025", name: "Nadia Osei", age: 73, symptoms: ["extreme fatigue", "confusion", "chest pain"], risk: "HIGH", status: "Critical", last: "5 hr ago", avatar: "NO" },
+  { id: "P-0022", name: "Ryan Castillo", age: 38, symptoms: ["back pain", "mild nausea"], risk: "LOW", status: "Stable", last: "6 hr ago", avatar: "RC" },
+];
+
+const REPORTS_DATA = [
+  { id: "RPT-2024-091", title: "Weekly Risk Distribution Summary", type: "Risk Report", date: "May 5, 2026", status: "Ready", pages: 12, icon: "◈" },
+  { id: "RPT-2024-090", title: "Sentiment Trend Analysis — April", type: "Analytics", date: "May 1, 2026", status: "Ready", pages: 8, icon: "◉" },
+  { id: "RPT-2024-089", title: "High-Risk Patient Flags Log", type: "Audit Log", date: "Apr 28, 2026", status: "Ready", pages: 24, icon: "⚠" },
+  { id: "RPT-2024-088", title: "Model Accuracy Benchmark Q1", type: "Performance", date: "Apr 20, 2026", status: "Ready", pages: 31, icon: "▲" },
+  { id: "RPT-2024-087", title: "Emergency Escalation Summary", type: "Clinical", date: "Apr 15, 2026", status: "Archived", pages: 7, icon: "✦" },
+  { id: "RPT-2024-086", title: "Daily Analyses Digest — Wk 14", type: "Digest", date: "Apr 7, 2026", status: "Archived", pages: 5, icon: "◇" },
+];
+
+const SYMPTOM_FREQ_DATA = [
+  { name: "Fatigue", count: 55 }, { name: "Headache", count: 42 }, { name: "Fever", count: 38 },
+  { name: "Nausea", count: 29 }, { name: "Dizziness", count: 21 }, { name: "Chest Pain", count: 14 },
+];
+const RISK_PIE = [
+  { name: "Low", value: 54, color: COLORS.success },
+  { name: "Medium", value: 31, color: COLORS.warning },
+  { name: "High", value: 15, color: COLORS.danger },
+];
+const SENTIMENT_TREND = [
+  { date: "Mon", positive: 30, neutral: 45, negative: 25 }, { date: "Tue", positive: 28, neutral: 42, negative: 30 },
+  { date: "Wed", positive: 35, neutral: 40, negative: 25 }, { date: "Thu", positive: 22, neutral: 38, negative: 40 },
+  { date: "Fri", positive: 40, neutral: 35, negative: 25 }, { date: "Sat", positive: 45, neutral: 38, negative: 17 },
+  { date: "Sun", positive: 38, neutral: 44, negative: 18 },
+];
+const ANALYSES_TREND = [
+  { date: "Apr 29", analyses: 980, high: 120 }, { date: "Apr 30", analyses: 1050, high: 145 },
+  { date: "May 1", analyses: 1120, high: 132 }, { date: "May 2", analyses: 1089, high: 158 },
+  { date: "May 3", analyses: 1200, high: 141 }, { date: "May 4", analyses: 1180, high: 127 },
+  { date: "May 5", analyses: 1284, high: 163 },
+];
+
+const SAMPLE_INPUTS = [
+  { label: "Severe headache after medication", text: "I've had a severe splitting headache for the past 6 hours after taking my new blood pressure medication. The pain is unbearable, and I feel like I'm going to vomit. My vision is slightly blurred." },
+  { label: "Mild fever since morning", text: "Woke up with a mild fever this morning, around 99.5°F. Feeling a bit tired and have a slight sore throat. Took some Tylenol and drinking plenty of fluids." },
+  { label: "Feeling dizzy and nauseous", text: "I've been feeling dizzy and nauseous since yesterday. The room spins when I stand up. Also experiencing some chest tightness and shortness of breath." },
+];
+const MOCK_RESPONSES = {
+  severe: { symptoms: ["severe headache", "nausea", "blurred vision", "medication reaction"], sentiment: "negative", risk_level: "HIGH", confidence: 94, reason: ["Multiple severe symptoms detected simultaneously", "Strongly negative sentiment signals acute distress", "Blurred vision combined with headache matches hypertensive crisis pattern", "Post-medication onset suggests adverse drug reaction"] },
+  mild: { symptoms: ["mild fever", "fatigue", "sore throat"], sentiment: "neutral", risk_level: "LOW", confidence: 87, reason: ["Symptoms are mild and localized", "Neutral sentiment indicates manageable condition", "Patient is self-managing appropriately", "No red-flag symptoms detected"] },
+  dizzy: { symptoms: ["dizziness", "nausea", "chest tightness", "shortness of breath"], sentiment: "negative", risk_level: "MEDIUM", confidence: 79, reason: ["Combination of dizziness and chest tightness requires monitoring", "Respiratory symptoms elevate risk tier", "Negative sentiment indicates patient distress", "Pattern resembles early-stage cardiovascular event"] },
+};
+function getMockResponse(text) {
+  const l = text.toLowerCase();
+  if (l.includes("severe") || l.includes("unbearable") || l.includes("blurred")) return MOCK_RESPONSES.severe;
+  if (l.includes("mild") || l.includes("sore throat") || l.includes("tylenol")) return MOCK_RESPONSES.mild;
+  return MOCK_RESPONSES.dizzy;
+}
+
+// ─── SHARED UI COMPONENTS ─────────────────────────────────────────────────────
+function Pill({ label, color, bg }) {
+  return (
+    <span style={{ background: bg || "rgba(99,102,241,0.12)", color: color || COLORS.primaryLight, border: `1px solid ${color || COLORS.primary}33`, borderRadius: 6, padding: "3px 9px", fontSize: 11, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+      {label}
+    </span>
+  );
+}
+
+function RiskBadge({ level }) {
+  const cfg = RISK_CONFIG[level] || RISK_CONFIG.LOW;
+  return <Pill label={cfg.label} color={cfg.color} bg={cfg.bg} />;
+}
+
+function StatusBadge({ status }) {
+  const map = { Critical: COLORS.danger, Monitoring: COLORS.warning, Stable: COLORS.success, "Under Review": COLORS.info, Archived: COLORS.textMuted, Ready: COLORS.success };
+  const c = map[status] || COLORS.textMuted;
+  return <Pill label={status} color={c} bg={`${c}18`} />;
+}
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "#0d1424", border: "1px solid rgba(99,102,241,0.25)", borderRadius: 10, padding: "10px 14px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textDim, marginBottom: 6, fontFamily: "'Manrope', sans-serif" }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ fontSize: 13, color: p.color, fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}>{p.name}: {p.value}</div>
+      ))}
+    </div>
+  );
+};
+
+function Avatar({ initials, size = 36, gradient = "linear-gradient(135deg, #6366f1, #8b5cf6)" }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: gradient, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 700, color: "white", flexShrink: 0, fontFamily: "'Syne', sans-serif" }}>
+      {initials}
+    </div>
+  );
+}
+
+function GlassCard({ children, style = {}, className = "" }) {
+  return (
+    <div className={`card ${className}`} style={{
+      background: COLORS.bgCard,
+      border: `1px solid ${COLORS.bgCardBorder}`,
+      borderRadius: 18,
+      boxShadow: "0 4px 32px rgba(0,0,0,0.3)",
+      ...style,
+    }}>{children}</div>
+  );
+}
+
+function StatCard({ label, value, sub, accent, icon }) {
+  return (
+    <GlassCard style={{ padding: "20px 24px", flex: 1, borderLeft: `2px solid ${accent}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "'Manrope', sans-serif" }}>{label}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>{value}</div>
+          <div style={{ fontSize: 11.5, color: COLORS.textDim, marginTop: 6, fontFamily: "'Manrope', sans-serif" }}>{sub}</div>
+        </div>
+        {icon && <div style={{ fontSize: 22, opacity: 0.4 }}>{icon}</div>}
+      </div>
+    </GlassCard>
+  );
+}
+
+function SkeletonLoader() {
+  const shimmer = { background: "linear-gradient(90deg, #0d1424 25%, #131c30 50%, #0d1424 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", borderRadius: 8 };
+  return (
+    <GlassCard style={{ padding: 24 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+        <div style={{ ...shimmer, width: 48, height: 48, borderRadius: 12 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ ...shimmer, height: 18, marginBottom: 8, width: "55%" }} />
+          <div style={{ ...shimmer, height: 13, width: "35%" }} />
+        </div>
+      </div>
+      {[100, 80, 90].map((w, i) => <div key={i} style={{ ...shimmer, height: 13, width: `${w}%`, marginBottom: 10 }} />)}
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        {[60, 80, 70].map((w, i) => <div key={i} style={{ ...shimmer, height: 28, width: w, borderRadius: 14 }} />)}
+      </div>
+    </GlassCard>
+  );
+}
+
+// ─── AUTH PAGES ───────────────────────────────────────────────────────────────
+function AuthLayout({ children, title, subtitle }) {
+  return (
+    <div style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      {/* Background decoration */}
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)", top: -200, right: -100 }} />
+        <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)", bottom: -100, left: -50 }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0)`, backgroundSize: "40px 40px" }} />
+      </div>
+      <div className="page-enter" style={{ width: "100%", maxWidth: 440, padding: "0 20px", position: "relative", zIndex: 1 }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "white", boxShadow: "0 0 24px rgba(99,102,241,0.5)", fontFamily: "'Syne', sans-serif" }}>A</div>
+            <span style={{ fontSize: 24, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif", letterSpacing: "0.1em" }}>AURA</span>
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Manrope', sans-serif" }}>Health Signal Intelligence</div>
+        </div>
+        <GlassCard style={{ padding: "36px 40px" }}>
+          <div style={{ marginBottom: 28 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 6 }}>{title}</h1>
+            <p style={{ fontSize: 13, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>{subtitle}</p>
+          </div>
+          {children}
+        </GlassCard>
+        <div style={{ textAlign: "center", marginTop: 24, fontSize: 12, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>
+          AURA v1.0 · For clinical decision support only
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InputField({ label, type = "text", value, onChange, placeholder }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: COLORS.textDim, marginBottom: 8, letterSpacing: "0.04em", fontFamily: "'Manrope', sans-serif", textTransform: "uppercase" }}>{label}</label>
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "12px 16px", fontSize: 14, color: COLORS.text, fontFamily: "'Manrope', sans-serif", transition: "all 0.2s", boxSizing: "border-box" }} />
+    </div>
+  );
+}
+
+function LoginPage({ onLogin, onGo }) {
+  const [email, setEmail] = useState("doctor@aura.ai");
+  const [password, setPassword] = useState("••••••••");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (!email || !password) { setError("Please fill in all fields."); return; }
+    setLoading(true); setError("");
+    await new Promise(r => setTimeout(r, 1200));
+    onLogin({ name: "Dr. Reyes", email, role: "Senior Clinician", initials: "DR" });
+    setLoading(false);
+  };
+
+  return (
+    <AuthLayout title="Welcome back" subtitle="Sign in to your clinical dashboard">
+      <InputField label="Email Address" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="doctor@hospital.com" />
+      <InputField label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" />
+      {error && <div style={{ fontSize: 12, color: COLORS.danger, marginBottom: 12, fontFamily: "'Manrope', sans-serif" }}>{error}</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <span style={{ fontSize: 12, color: COLORS.primaryLight, cursor: "pointer", fontFamily: "'Manrope', sans-serif" }}>Forgot password?</span>
+      </div>
+      <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "'Syne', sans-serif", letterSpacing: "0.05em", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.8 : 1 }}>
+        {loading ? <><span style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> Authenticating…</> : "Sign In →"}
+      </button>
+      <div style={{ marginTop: 24, textAlign: "center", fontSize: 13, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>
+        Don't have an account? <span onClick={() => onGo("signup")} style={{ color: COLORS.primaryLight, cursor: "pointer", fontWeight: 600 }}>Sign up</span>
+      </div>
+    </AuthLayout>
+  );
+}
+
+function SignupPage({ onLogin, onGo }) {
+  const [form, setForm] = useState({ name: "", email: "", role: "", password: "" });
+  const [loading, setLoading] = useState(false);
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1200));
+    const initials = form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "DR";
+    onLogin({ name: form.name || "Dr. User", email: form.email, role: form.role || "Clinician", initials });
+    setLoading(false);
+  };
+
+  return (
+    <AuthLayout title="Create account" subtitle="Join AURA clinical intelligence platform">
+      <InputField label="Full Name" value={form.name} onChange={set("name")} placeholder="Dr. Jane Doe" />
+      <InputField label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="doctor@hospital.com" />
+      <InputField label="Role / Specialty" value={form.role} onChange={set("role")} placeholder="e.g. Emergency Medicine" />
+      <InputField label="Password" type="password" value={form.password} onChange={set("password")} placeholder="Create a strong password" />
+      <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "'Syne', sans-serif", letterSpacing: "0.05em", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {loading ? <><span style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> Creating account…</> : "Create Account →"}
+      </button>
+      <div style={{ marginTop: 24, textAlign: "center", fontSize: 13, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>
+        Already have an account? <span onClick={() => onGo("login")} style={{ color: COLORS.primaryLight, cursor: "pointer", fontWeight: 600 }}>Sign in</span>
+      </div>
+    </AuthLayout>
+  );
+}
+
+// ─── NAVBAR ───────────────────────────────────────────────────────────────────
+function Navbar({ user, currentPage, onNavigate, onLogout }) {
+  const [dropdown, setDropdown] = useState(false);
+  const dropRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setDropdown(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const navItems = [
+    { id: "dashboard", label: "Dashboard" },
+    { id: "patients", label: "Patients" },
+    { id: "analytics", label: "Analytics" },
+    { id: "reports", label: "Reports" },
+  ];
+
+  return (
+    <nav style={{ background: "rgba(7,11,20,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 200, boxShadow: "0 4px 32px rgba(0,0,0,0.4)" }}>
+      {/* Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "white", boxShadow: "0 0 16px rgba(99,102,241,0.4)", fontFamily: "'Syne', sans-serif" }}>A</div>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "0.1em", color: COLORS.text, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>AURA</div>
+          <div style={{ fontSize: 9, color: COLORS.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Manrope', sans-serif" }}>Signal Intelligence</div>
+        </div>
+      </div>
+
+      {/* Nav Links */}
+      <div className="top-nav-links" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {navItems.map(item => (
+          <button key={item.id} className={`nav-item ${currentPage === item.id ? "active" : ""}`} onClick={() => onNavigate(item.id)} style={{ background: currentPage === item.id ? "rgba(99,102,241,0.15)" : "transparent", border: `1px solid ${currentPage === item.id ? "rgba(99,102,241,0.4)" : "transparent"}`, color: currentPage === item.id ? "#818cf8" : COLORS.textDim, padding: "6px 16px", borderRadius: 9, fontSize: 13, fontFamily: "'Manrope', sans-serif", cursor: "pointer", fontWeight: currentPage === item.id ? 600 : 400 }}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* User Area */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.success, boxShadow: `0 0 8px ${COLORS.success}`, animation: "glow 2s infinite" }} />
+        <div ref={dropRef} style={{ position: "relative" }}>
+          <button onClick={() => setDropdown(d => !d)} style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "6px 12px 6px 8px", cursor: "pointer", transition: "all 0.2s" }}>
+            <Avatar initials={user?.initials || "DR"} size={28} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, fontFamily: "'Manrope', sans-serif", lineHeight: 1 }}>{user?.name || "Dr. Reyes"}</div>
+              <div style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>{user?.role || "Clinician"}</div>
+            </div>
+            <span style={{ color: COLORS.textMuted, fontSize: 10, marginLeft: 4 }}>{dropdown ? "▲" : "▼"}</span>
+          </button>
+          {dropdown && (
+            <div className="dropdown-menu" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#0d1424", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, width: 180, boxShadow: "0 16px 48px rgba(0,0,0,0.6)", overflow: "hidden", zIndex: 300 }}>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, fontFamily: "'Manrope', sans-serif" }}>{user?.name}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", marginTop: 2 }}>{user?.email}</div>
+              </div>
+              {[{ label: "👤  Profile", action: null }, { label: "⚙   Settings", action: null }].map(item => (
+                <button key={item.label} onClick={() => { setDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", textAlign: "left", fontSize: 13, color: COLORS.textDim, fontFamily: "'Manrope', sans-serif", cursor: "pointer", transition: "all 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.08)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>{item.label}</button>
+              ))}
+              <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+              <button onClick={() => { setDropdown(false); onLogout(); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", textAlign: "left", fontSize: 13, color: COLORS.danger, fontFamily: "'Manrope', sans-serif", cursor: "pointer", fontWeight: 600, transition: "all 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.08)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                ⏻  Sign Out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+// ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
+function InputPanel({ onAnalyze, loading }) {
+  const [text, setText] = useState("");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <GlassCard style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>Patient Signal Input</div>
+            <div style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 2, fontFamily: "'Manrope', sans-serif" }}>Clinical notes or patient-reported text</div>
+          </div>
+          <Pill label="NLP v3.2" color={COLORS.info} bg="rgba(6,182,212,0.1)" />
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Enter patient text or clinical note…" style={{ width: "100%", height: 150, border: "1.5px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px", fontSize: 13.5, color: COLORS.text, background: "rgba(255,255,255,0.03)", resize: "none", fontFamily: "'Manrope', sans-serif", lineHeight: "1.6", boxSizing: "border-box", transition: "all 0.2s" }} />
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7, fontFamily: "'Manrope', sans-serif" }}>Quick samples</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {SAMPLE_INPUTS.map((s, i) => (
+                <button key={i} onClick={() => setText(s.text)} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "7px 12px", textAlign: "left", fontSize: 12, color: COLORS.textDim, cursor: "pointer", fontFamily: "'Manrope', sans-serif", transition: "all 0.15s" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.08)"; e.currentTarget.style.color = COLORS.primaryLight; }} onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = COLORS.textDim; }}>
+                  ↗ {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "0 20px 20px" }}>
+          <button className="btn-primary" onClick={() => text.trim() && onAnalyze(text)} disabled={loading || !text.trim()} style={{ width: "100%", padding: "13px", borderRadius: 11, border: "none", background: text.trim() && !loading ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "rgba(255,255,255,0.06)", color: text.trim() && !loading ? "white" : COLORS.textMuted, fontSize: 13.5, fontWeight: 700, cursor: text.trim() && !loading ? "pointer" : "not-allowed", fontFamily: "'Syne', sans-serif", letterSpacing: "0.04em", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: text.trim() && !loading ? "0 4px 20px rgba(99,102,241,0.35)" : "none" }}>
+            {loading ? <><span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />Analyzing…</> : "⚡ Analyze Health Signal"}
+          </button>
+        </div>
+      </GlassCard>
+      <GlassCard style={{ padding: "14px 18px" }}>
+        <div style={{ fontSize: 10, color: COLORS.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontFamily: "'Manrope', sans-serif" }}>Model Status</div>
+        {[{ label: "NLP Engine", val: "Active", ok: true }, { label: "Risk Model", val: "v2.4.1", ok: true }, { label: "Avg Latency", val: "~1.2s", ok: true }].map(item => (
+          <div key={item.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+            <span style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>{item.label}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: item.ok ? COLORS.success : COLORS.danger, fontFamily: "'JetBrains Mono', monospace", background: item.ok ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", padding: "2px 8px", borderRadius: 5 }}>{item.val}</span>
+          </div>
+        ))}
+      </GlassCard>
+    </div>
+  );
+}
+
+function ResultPanel({ result, visible }) {
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => { if (visible && result) { setTimeout(() => setAnimated(true), 50); } else { setAnimated(false); } }, [visible, result]);
+  if (!result) return (
+    <GlassCard style={{ padding: "52px 28px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, border: "1px dashed rgba(255,255,255,0.07)", minHeight: 320 }}>
+      <div style={{ fontSize: 44, opacity: 0.12, animation: "float 3s ease infinite" }}>◎</div>
+      <div style={{ fontSize: 14, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", textAlign: "center", lineHeight: 1.7 }}>
+        Enter patient text and click<br /><strong style={{ color: COLORS.primaryLight }}>Analyze Health Signal</strong> to begin
+      </div>
+    </GlassCard>
+  );
+  const cfg = RISK_CONFIG[result.risk_level];
+  const sentimentColors = { negative: COLORS.danger, neutral: COLORS.warning, positive: COLORS.success };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: animated ? 1 : 0, transform: animated ? "translateY(0)" : "translateY(14px)", transition: "all 0.4s cubic-bezier(0.16,1,0.3,1)" }}>
+      <GlassCard style={{ overflow: "hidden", border: `1px solid ${cfg.border}` }}>
+        <div style={{ background: cfg.bg, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${cfg.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 50, height: 50, borderRadius: 14, background: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "white", animation: result.risk_level === "HIGH" ? "pulse 2s infinite" : "none", boxShadow: result.risk_level === "HIGH" ? `0 0 20px ${cfg.color}80` : "none" }}>{cfg.icon}</div>
+            <div>
+              <div style={{ fontSize: 10, color: cfg.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: "'Manrope', sans-serif" }}>Risk Assessment</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: cfg.color, fontFamily: "'Syne', sans-serif", lineHeight: 1.1 }}>{result.risk_level}</div>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>Confidence</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>{result.confidence}%</div>
+            <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2, marginTop: 5 }}>
+              <div style={{ width: `${result.confidence}%`, height: "100%", background: cfg.color, borderRadius: 2, transition: "width 0.8s ease" }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "16px 22px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Manrope', sans-serif", marginBottom: 7 }}>Detected Symptoms</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {result.symptoms.map((s, i) => <Pill key={i} label={`◦ ${s}`} />)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Manrope', sans-serif", marginBottom: 7 }}>Sentiment Analysis</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Pill label={result.sentiment.toUpperCase()} color={sentimentColors[result.sentiment]} bg={`${sentimentColors[result.sentiment]}18`} />
+              <div style={{ display: "flex", gap: 3 }}>{[1,2,3,4,5].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: 2, background: result.sentiment === "negative" && i <= 4 ? COLORS.danger : result.sentiment === "neutral" && i <= 3 ? COLORS.warning : result.sentiment === "positive" ? COLORS.success : "rgba(255,255,255,0.1)" }} />)}</div>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+      <GlassCard style={{ padding: "16px 22px" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>◈ Why this result?</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {result.reason.map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white", fontWeight: 700, flexShrink: 0, marginTop: 1, fontFamily: "'JetBrains Mono', monospace" }}>{i + 1}</div>
+              <span style={{ fontSize: 12.5, color: COLORS.textDim, fontFamily: "'Manrope', sans-serif", lineHeight: 1.55 }}>{r}</span>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+function DashboardPage() {
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  const handleAnalyze = async (text) => {
+    setLoading(true); setVisible(false); setResult(null);
+    await new Promise(r => setTimeout(r, 1400));
+    setResult(getMockResponse(text)); setLoading(false);
+    setTimeout(() => setVisible(true), 50);
+  };
+
+  return (
+    <div className="page-enter" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {/* Stats */}
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <StatCard label="Analyses Today" value="1,284" sub="↑ 8.2% from yesterday" accent={COLORS.primary} icon="◉" />
+        <StatCard label="High Risk Flagged" value="39" sub="Requires immediate review" accent={COLORS.danger} icon="⚠" />
+        <StatCard label="Avg Confidence" value="91.4%" sub="Model accuracy score" accent={COLORS.success} icon="✓" />
+        <StatCard label="Avg Latency" value="1.19s" sub="API response time" accent={COLORS.warning} icon="⚡" />
+      </div>
+      {/* Main Grid */}
+      <div className="main-grid" style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 18, alignItems: "start" }}>
+        <InputPanel onAnalyze={handleAnalyze} loading={loading} />
+        <div>{loading ? <SkeletonLoader /> : <ResultPanel result={result} visible={visible} />}</div>
+      </div>
+      {/* Charts */}
+      <GlassCard style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>Analytics Overview</div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2, fontFamily: "'Manrope', sans-serif" }}>Last 7 days · 248 analyses processed</div>
+          </div>
+          <Pill label="↑ 12.4% vs last week" color={COLORS.success} bg="rgba(16,185,129,0.1)" />
+        </div>
+        <div className="charts-grid" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, fontFamily: "'Manrope', sans-serif" }}>Symptom Frequency</div>
+            <ResponsiveContainer width="100%" height={170}><BarChart data={SYMPTOM_FREQ_DATA} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 9, fill: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient></defs><Bar dataKey="count" fill="url(#barGrad)" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, fontFamily: "'Manrope', sans-serif" }}>Risk Distribution</div>
+            <ResponsiveContainer width="100%" height={170}><PieChart><Pie data={RISK_PIE} cx="50%" cy="50%" innerRadius={46} outerRadius={68} paddingAngle={3} dataKey="value">{RISK_PIE.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip content={<CustomTooltip />} /></PieChart></ResponsiveContainer>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 6 }}>
+              {RISK_PIE.map(d => (<div key={d.name} style={{ display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 7, height: 7, borderRadius: 2, background: d.color }} /><span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>{d.name} {d.value}%</span></div>))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, fontFamily: "'Manrope', sans-serif" }}>Sentiment Trend</div>
+            <ResponsiveContainer width="100%" height={170}><AreaChart data={SENTIMENT_TREND}><defs><linearGradient id="posGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.success} stopOpacity={0.25} /><stop offset="95%" stopColor={COLORS.success} stopOpacity={0} /></linearGradient><linearGradient id="negGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.danger} stopOpacity={0.25} /><stop offset="95%" stopColor={COLORS.danger} stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><Area type="monotone" dataKey="positive" stroke={COLORS.success} strokeWidth={2} fill="url(#posGrad)" name="Positive" /><Area type="monotone" dataKey="neutral" stroke={COLORS.warning} strokeWidth={2} fill="none" strokeDasharray="4 3" name="Neutral" /><Area type="monotone" dataKey="negative" stroke={COLORS.danger} strokeWidth={2} fill="url(#negGrad)" name="Negative" /></AreaChart></ResponsiveContainer>
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ─── PATIENTS PAGE ─────────────────────────────────────────────────────────────
+function PatientsPage() {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("ALL");
+  const filtered = PATIENTS_DATA.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
+    const matchFilter = filter === "ALL" || p.risk === filter;
+    return matchSearch && matchFilter;
+  });
+
+  return (
+    <div className="page-enter" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>Patients</h1>
+          <p style={{ fontSize: 12.5, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", marginTop: 3 }}>{PATIENTS_DATA.length} patients · {PATIENTS_DATA.filter(p => p.risk === "HIGH").length} critical</p>
+        </div>
+        <button className="btn-primary" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", color: "white", padding: "9px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Manrope', sans-serif", boxShadow: "0 4px 16px rgba(99,102,241,0.3)" }}>+ Add Patient</button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: COLORS.textMuted, fontSize: 13 }}>⌕</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or ID…" style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 14px 10px 34px", fontSize: 13, color: COLORS.text, fontFamily: "'Manrope', sans-serif", boxSizing: "border-box" }} />
+        </div>
+        {["ALL", "HIGH", "MEDIUM", "LOW"].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: "8px 16px", borderRadius: 9, border: `1px solid ${filter === f ? (f === "HIGH" ? COLORS.danger : f === "MEDIUM" ? COLORS.warning : f === "LOW" ? COLORS.success : COLORS.primary) + "55" : "rgba(255,255,255,0.07)"}`, background: filter === f ? (f === "HIGH" ? "rgba(239,68,68,0.12)" : f === "MEDIUM" ? "rgba(245,158,11,0.12)" : f === "LOW" ? "rgba(16,185,129,0.12)" : "rgba(99,102,241,0.12)") : "transparent", color: filter === f ? COLORS.text : COLORS.textMuted, fontSize: 12, fontWeight: filter === f ? 600 : 400, cursor: "pointer", fontFamily: "'Manrope', sans-serif", transition: "all 0.2s" }}>{f}</button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <GlassCard style={{ overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                {["Patient", "ID", "Age", "Symptoms", "Risk", "Status", "Last Update", ""].map(h => (
+                  <th key={h} style={{ padding: "13px 18px", textAlign: "left", fontSize: 10, fontWeight: 600, color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Manrope', sans-serif", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p, i) => (
+                <tr key={p.id} className="table-row" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.15s" }}>
+                  <td style={{ padding: "14px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Avatar initials={p.avatar} size={34} gradient={p.risk === "HIGH" ? "linear-gradient(135deg, #ef4444, #dc2626)" : p.risk === "MEDIUM" ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #6366f1, #8b5cf6)"} />
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.text, fontFamily: "'Manrope', sans-serif" }}>{p.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: "14px 18px" }}><span style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{p.id}</span></td>
+                  <td style={{ padding: "14px 18px" }}><span style={{ fontSize: 13, color: COLORS.textDim, fontFamily: "'Manrope', sans-serif" }}>{p.age}</span></td>
+                  <td style={{ padding: "14px 18px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {p.symptoms.slice(0, 2).map((s, j) => <Pill key={j} label={s} />)}
+                      {p.symptoms.length > 2 && <Pill label={`+${p.symptoms.length - 2}`} color={COLORS.textMuted} bg="rgba(255,255,255,0.05)" />}
+                    </div>
+                  </td>
+                  <td style={{ padding: "14px 18px" }}><RiskBadge level={p.risk} /></td>
+                  <td style={{ padding: "14px 18px" }}><StatusBadge status={p.status} /></td>
+                  <td style={{ padding: "14px 18px" }}><span style={{ fontSize: 11.5, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>{p.last}</span></td>
+                  <td style={{ padding: "14px 18px" }}>
+                    <button style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 7, padding: "5px 12px", fontSize: 12, color: COLORS.primaryLight, cursor: "pointer", fontFamily: "'Manrope', sans-serif", fontWeight: 500, transition: "all 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.2)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(99,102,241,0.1)"}>View</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "48px 24px", color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", fontSize: 14 }}>No patients found.</div>
+          )}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ─── ANALYTICS PAGE ────────────────────────────────────────────────────────────
+function AnalyticsPage() {
+  const [timeRange, setTimeRange] = useState("7d");
+  const [metric, setMetric] = useState("all");
+
+  return (
+    <div className="page-enter" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>Analytics</h1>
+          <p style={{ fontSize: 12.5, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", marginTop: 3 }}>Performance insights · NLP model intelligence</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select value={timeRange} onChange={e => setTimeRange(e.target.value)} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 14px", fontSize: 12.5, color: COLORS.textDim, fontFamily: "'Manrope', sans-serif", cursor: "pointer" }}>
+            {[["7d", "Last 7 days"], ["30d", "Last 30 days"], ["90d", "Last 90 days"]].map(([v, l]) => <option key={v} value={v} style={{ background: "#0d1424" }}>{l}</option>)}
+          </select>
+          <select value={metric} onChange={e => setMetric(e.target.value)} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 14px", fontSize: 12.5, color: COLORS.textDim, fontFamily: "'Manrope', sans-serif", cursor: "pointer" }}>
+            {[["all", "All Metrics"], ["risk", "Risk Only"], ["sentiment", "Sentiment Only"]].map(([v, l]) => <option key={v} value={v} style={{ background: "#0d1424" }}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Stat row */}
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <StatCard label="Total Analyses" value="8,491" sub="↑ 14.2% this period" accent={COLORS.primary} icon="◉" />
+        <StatCard label="HIGH Risk Rate" value="15.2%" sub="↓ 2.1% from last period" accent={COLORS.danger} icon="⚠" />
+        <StatCard label="Avg Confidence" value="91.4%" sub="Model v2.4.1" accent={COLORS.success} icon="✓" />
+        <StatCard label="False Positive" value="3.8%" sub="Validated by clinicians" accent={COLORS.warning} icon="◈" />
+      </div>
+
+      {/* Big chart */}
+      <GlassCard style={{ padding: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 18 }}>Daily Analyses Volume</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={ANALYSES_TREND}>
+            <defs>
+              <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="hGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={COLORS.danger} stopOpacity={0.25} />
+                <stop offset="95%" stopColor={COLORS.danger} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: COLORS.textMuted }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: COLORS.textMuted }} axisLine={false} tickLine={false} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend formatter={v => <span style={{ color: COLORS.textDim, fontSize: 11, fontFamily: "'Manrope', sans-serif" }}>{v}</span>} />
+            <Area type="monotone" dataKey="analyses" stroke="#6366f1" strokeWidth={2.5} fill="url(#aGrad)" name="Total Analyses" />
+            <Area type="monotone" dataKey="high" stroke={COLORS.danger} strokeWidth={2} fill="url(#hGrad)" name="High Risk" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </GlassCard>
+
+      {/* 3-col charts */}
+      <div className="charts-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <GlassCard style={{ padding: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 14 }}>Symptom Frequency</div>
+          <ResponsiveContainer width="100%" height={200}><BarChart data={SYMPTOM_FREQ_DATA} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><defs><linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient></defs><Bar dataKey="count" fill="url(#barGrad2)" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+        </GlassCard>
+        <GlassCard style={{ padding: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 14 }}>Risk Distribution</div>
+          <ResponsiveContainer width="100%" height={200}><PieChart><Pie data={RISK_PIE} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">{RISK_PIE.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip content={<CustomTooltip />} /></PieChart></ResponsiveContainer>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 6 }}>{RISK_PIE.map(d => (<div key={d.name} style={{ display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 7, height: 7, borderRadius: 2, background: d.color }} /><span style={{ fontSize: 10, color: COLORS.textMuted }}>{d.name} {d.value}%</span></div>))}</div>
+        </GlassCard>
+        <GlassCard style={{ padding: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", marginBottom: 14 }}>Sentiment Trend</div>
+          <ResponsiveContainer width="100%" height={200}><AreaChart data={SENTIMENT_TREND}><defs><linearGradient id="posG2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.success} stopOpacity={0.25} /><stop offset="95%" stopColor={COLORS.success} stopOpacity={0} /></linearGradient><linearGradient id="negG2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.danger} stopOpacity={0.25} /><stop offset="95%" stopColor={COLORS.danger} stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: COLORS.textMuted }} axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><Area type="monotone" dataKey="positive" stroke={COLORS.success} strokeWidth={2} fill="url(#posG2)" name="Positive" /><Area type="monotone" dataKey="neutral" stroke={COLORS.warning} strokeWidth={2} fill="none" strokeDasharray="4 3" name="Neutral" /><Area type="monotone" dataKey="negative" stroke={COLORS.danger} strokeWidth={2} fill="url(#negG2)" name="Negative" /></AreaChart></ResponsiveContainer>
+        </GlassCard>
+      </div>
+    </div>
+  );
+}
+
+// ─── REPORTS PAGE ──────────────────────────────────────────────────────────────
+function ReportsPage() {
+  const [filter, setFilter] = useState("All");
+  const types = ["All", "Risk Report", "Analytics", "Audit Log", "Performance", "Clinical", "Digest"];
+  const filtered = filter === "All" ? REPORTS_DATA : REPORTS_DATA.filter(r => r.type === filter);
+
+  return (
+    <div className="page-enter" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, fontFamily: "'Syne', sans-serif" }}>Reports</h1>
+          <p style={{ fontSize: 12.5, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", marginTop: 3 }}>{REPORTS_DATA.length} reports · {REPORTS_DATA.filter(r => r.status === "Ready").length} ready to download</p>
+        </div>
+        <button className="btn-primary" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", color: "white", padding: "9px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Manrope', sans-serif", boxShadow: "0 4px 16px rgba(99,102,241,0.3)" }}>+ Generate Report</button>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {types.map(t => (
+          <button key={t} onClick={() => setFilter(t)} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${filter === t ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`, background: filter === t ? "rgba(99,102,241,0.15)" : "transparent", color: filter === t ? COLORS.primaryLight : COLORS.textMuted, fontSize: 12, fontWeight: filter === t ? 600 : 400, cursor: "pointer", fontFamily: "'Manrope', sans-serif", transition: "all 0.2s" }}>{t}</button>
+        ))}
+      </div>
+
+      {/* Cards grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+        {filtered.map(report => (
+          <GlassCard key={report.id} style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{report.icon}</div>
+              <StatusBadge status={report.status} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text, fontFamily: "'Syne', sans-serif", lineHeight: 1.4, marginBottom: 5 }}>{report.title}</div>
+              <Pill label={report.type} color={COLORS.primaryLight} bg="rgba(99,102,241,0.1)" />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 12, marginTop: -2 }}>
+              <div>
+                <div style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif", marginBottom: 2 }}>{report.date}</div>
+                <div style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{report.id} · {report.pages}p</div>
+              </div>
+              <button style={{ background: report.status === "Ready" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${report.status === "Ready" ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, padding: "6px 14px", fontSize: 12, color: report.status === "Ready" ? COLORS.success : COLORS.textMuted, cursor: "pointer", fontFamily: "'Manrope', sans-serif", fontWeight: 500, transition: "all 0.2s", display: "flex", alignItems: "center", gap: 5 }} onMouseEnter={e => { if (report.status === "Ready") e.currentTarget.style.background = "rgba(16,185,129,0.18)"; }} onMouseLeave={e => { e.currentTarget.style.background = report.status === "Ready" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)"; }}>
+                {report.status === "Ready" ? "↓ Download" : "Archived"}
+              </button>
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── APP SHELL ────────────────────────────────────────────────────────────────
+export default function App() {
+  const [auth, setAuth] = useState(() => {
+    try { const s = localStorage.getItem("aura_user"); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [page, setPage] = useState("login");
+  const [currentPage, setCurrentPage] = useState("dashboard");
+
+  useEffect(() => {
+    if (auth) setPage("app");
+    else setPage("login");
+  }, [auth]);
+
+  const handleLogin = (user) => {
+    try { localStorage.setItem("aura_user", JSON.stringify(user)); } catch {}
+    setAuth(user);
+    setPage("app");
+    setCurrentPage("dashboard");
+  };
+
+  const handleLogout = () => {
+    try { localStorage.removeItem("aura_user"); } catch {}
+    setAuth(null);
+    setPage("login");
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case "dashboard": return <DashboardPage />;
+      case "patients": return <PatientsPage />;
+      case "analytics": return <AnalyticsPage />;
+      case "reports": return <ReportsPage />;
+      default: return <DashboardPage />;
+    }
+  };
+
+  return (
+    <>
+      <GlobalStyles />
+      {page === "login" && <LoginPage onLogin={handleLogin} onGo={setPage} />}
+      {page === "signup" && <SignupPage onLogin={handleLogin} onGo={setPage} />}
+      {page === "app" && (
+        <div style={{ minHeight: "100vh", background: COLORS.bg }}>
+          <Navbar user={auth} currentPage={currentPage} onNavigate={(p) => { setCurrentPage(p); }} onLogout={handleLogout} />
+          <main style={{ maxWidth: 1320, margin: "0 auto", padding: "28px 24px 48px" }}>
+            {renderPage()}
+          </main>
+          <footer style={{ textAlign: "center", padding: "0 24px 28px", fontSize: 11, color: COLORS.textMuted, fontFamily: "'Manrope', sans-serif" }}>
+            AURA v1.0 · AI-Powered Health Signal Intelligence · For clinical decision support only · Not a substitute for medical diagnosis
+          </footer>
+        </div>
+      )}
+    </>
+  );
+}
